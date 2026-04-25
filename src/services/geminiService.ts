@@ -89,11 +89,14 @@ export async function generateProfilePicture(
         
         STYLE & TECHNICAL SPECS:
         - Theme Style: ${style.prompt}.
+        - Subject Details: 
+            * Age: ${settings.age || 'Keep original age'}
+            * Body Type: ${settings.weight || 'Keep original body weight'}
         - Shot Composition: ${range.name}.
-        - Lighting Control: ${settings.lighting} lighting.
-        - Background Type: ${settings.background} background.
-        - Subject Pose: ${settings.pose}.
-        - Expression/Mood: ${settings.mood}.
+        - Lighting: ${settings.lighting || 'Soft natural studio'} lighting.
+        - Background: ${settings.background || 'Studio plain'} background.
+        - Subject Pose: ${settings.pose || 'Keep original pose from reference'}.
+        - Expression/Mood: ${settings.mood || 'Professional'}.
         
         TECHNICAL QUALITY: High-end professional photography, masterpiece quality.
         

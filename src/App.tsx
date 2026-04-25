@@ -33,6 +33,8 @@ export default function App() {
     shotRange: 'professional-bust',
     styleId: 'corporate',
     count: 1,
+    weight: 'Keep original',
+    age: 'Keep original',
     lighting: 'Soft natural',
     background: 'Studio plain',
     pose: 'Keep original pose',

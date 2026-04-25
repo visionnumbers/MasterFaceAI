@@ -153,23 +153,38 @@ export const SHOT_RANGES = [
 export const LIGHTING_OPTIONS = [
   'Soft natural', 'Dramatic studio', 'Cinematic', 'Golden hour', 'Moody', 
   'Neon glow', 'High-key bright', 'Rembrandt', 'Backlit silhouette',
-  'Volumetric god rays', 'Softbox studio', 'Ring light', 'Fairy lights'
+  'Volumetric god rays', 'Softbox studio', 'Ring light', 'Fairy lights', 'Custom'
 ];
 export const BACKGROUND_OPTIONS = [
   'Studio plain', 'Subtle gradient', 'Environmental', 'Abstract', 'Transparent', 
   'Modern office', 'Lush garden', 'Urban street', 'Library bookshelf', 'Art gallery', 
   'Minimalist white', 'Cyberpunk city', 'Cozy cafe', 'Mountain peaks', 'Beach sunset', 
-  'Industrial loft', 'Futuristic server room', 'Japanese garden'
+  'Industrial loft', 'Futuristic server room', 'Japanese garden', 'Custom'
 ];
 export const MOOD_OPTIONS = [
   'Neutral professional', 'Confident', 'Warm smile', 'Serious', 'Creative', 
   'Thoughtful', 'Energetic', 'Mysterious', 'Friendly approachable', 'Vibrant',
-  'Playful', 'Brave', 'Reserved', 'Intense', 'Ethereal'
+  'Playful', 'Brave', 'Reserved', 'Intense', 'Ethereal', 'Custom'
+];
+export const WEIGHT_OPTIONS = [
+  'Keep original', 'Slimmer', 'Athletic/Toned', 'Muscular', 'Average', 'More healthy', 'Custom'
+];
+export const AGE_OPTIONS = [
+  'Keep original', 'Current age', 'Younger (Teen)', 'Young adult (20s)', 'Mature (40s)', 'Senior (60s+)', 'Custom'
 ];
 export const RATIO_OPTIONS = ['1:1', '16:9', '9:16', '4:3', '3:4'];
 export const POSE_OPTIONS = [
-  'Keep original pose', 'Slight improvement', 'Full creative pose', 
-  'Arms crossed', 'Leaning forward', 'Thinking pose', 'Looking away', 'Profile view',
-  'Candid looking aside', 'Hand on chin', 'Adjusting tie/glasses', 'Walking towards camera'
+  'Keep original pose', 
+  'Confident Standing Pose',
+  '🪑 Relaxed Sitting Position',
+  '🚶 Dynamic Walking Motion',
+  '🏃 Athletic Running Pose',
+  '🤸 Energetic Jumping Action',
+  '🙌 Celebratory Hands Up',
+  '🙅 Confident Crossed Arms',
+  '👋 Friendly Waving Gesture',
+  '👉 Direct Pointing Gesture',
+  '🤔 Thoughtful Contemplation',
+  'Custom'
 ];
 export const BATCH_COUNTS: (1 | 2)[] = [1, 2];

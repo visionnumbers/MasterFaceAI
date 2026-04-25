@@ -6,7 +6,7 @@ import {
   Ghost, Aperture, Zap, CheckCircle2, Layers, Move, Ban
 } from 'lucide-react';
 import { GenerationSettings, Category, Gender, ShotRange } from '../types';
-import { CATEGORIES, SHOT_RANGES, LIGHTING_OPTIONS, BACKGROUND_OPTIONS, MOOD_OPTIONS, RATIO_OPTIONS, POSE_OPTIONS, BATCH_COUNTS } from '../constants';
+import { CATEGORIES, SHOT_RANGES, LIGHTING_OPTIONS, BACKGROUND_OPTIONS, MOOD_OPTIONS, RATIO_OPTIONS, POSE_OPTIONS, BATCH_COUNTS, WEIGHT_OPTIONS, AGE_OPTIONS } from '../constants';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -184,55 +184,137 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-[10px]">
+              {/* Weight control */}
+              <div className="space-y-1">
+                <span className="text-slate-500 uppercase font-bold tracking-tighter">Weight</span>
+                <select 
+                  value={WEIGHT_OPTIONS.slice(0, -1).includes(settings.weight) ? settings.weight : 'Custom'} 
+                  onChange={(e) => updateSetting('weight', e.target.value === 'Custom' ? '' : e.target.value)}
+                  className={`w-full ${isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'} border-none py-1 outline-none rounded`}
+                >
+                  {WEIGHT_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+                {(!WEIGHT_OPTIONS.slice(0, -1).includes(settings.weight) || settings.weight === 'Custom') && (
+                  <input 
+                    type="text"
+                    placeholder="Describe the change (e.g., more muscular)"
+                    value={settings.weight === 'Custom' ? '' : settings.weight}
+                    onChange={(e) => updateSetting('weight', e.target.value)}
+                    className={`w-full mt-1 ${isDark ? 'bg-slate-800 text-slate-300 placeholder:text-slate-600' : 'bg-white text-slate-700 border-slate-200'} border rounded px-2 py-1 text-[9px] outline-none`}
+                  />
+                )}
+              </div>
+
+              {/* Age control */}
+              <div className="space-y-1">
+                <span className="text-slate-500 uppercase font-bold tracking-tighter">Age</span>
+                <select 
+                  value={AGE_OPTIONS.slice(0, -1).includes(settings.age) ? settings.age : 'Custom'} 
+                  onChange={(e) => updateSetting('age', e.target.value === 'Custom' ? '' : e.target.value)}
+                  className={`w-full ${isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'} border-none py-1 outline-none rounded`}
+                >
+                  {AGE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+                {(!AGE_OPTIONS.slice(0, -1).includes(settings.age) || settings.age === 'Custom') && (
+                  <input 
+                    type="text"
+                    placeholder="Describe the target age (e.g., 25 years old, middle-aged)"
+                    value={settings.age === 'Custom' ? '' : settings.age}
+                    onChange={(e) => updateSetting('age', e.target.value)}
+                    className={`w-full mt-1 ${isDark ? 'bg-slate-800 text-slate-300 placeholder:text-slate-600' : 'bg-white text-slate-700 border-slate-200'} border rounded px-2 py-1 text-[9px] outline-none`}
+                  />
+                )}
+              </div>
+
               <div className="space-y-1">
                 <span className="text-slate-500 uppercase font-bold tracking-tighter">Lighting</span>
                 <select 
-                  value={settings.lighting} 
-                  onChange={(e) => updateSetting('lighting', e.target.value)}
-                  className={`w-full ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-none text-slate-300 py-1 outline-none rounded`}
+                  value={LIGHTING_OPTIONS.slice(0, -1).includes(settings.lighting) ? settings.lighting : 'Custom'} 
+                  onChange={(e) => updateSetting('lighting', e.target.value === 'Custom' ? '' : e.target.value)}
+                  className={`w-full ${isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'} border-none py-1 outline-none rounded`}
                 >
                   {LIGHTING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {(!LIGHTING_OPTIONS.slice(0, -1).includes(settings.lighting) || settings.lighting === 'Custom') && (
+                  <input 
+                    type="text"
+                    placeholder="e.g. golden hour rim light"
+                    value={settings.lighting === 'Custom' ? '' : settings.lighting}
+                    onChange={(e) => updateSetting('lighting', e.target.value)}
+                    className={`w-full mt-1 ${isDark ? 'bg-slate-800 text-slate-300 placeholder:text-slate-600' : 'bg-white text-slate-700 border-slate-200'} border rounded px-2 py-1 text-[9px] outline-none`}
+                  />
+                )}
               </div>
+
               <div className="space-y-1">
                 <span className="text-slate-500 uppercase font-bold tracking-tighter">Background</span>
                 <select 
-                  value={settings.background} 
-                  onChange={(e) => updateSetting('background', e.target.value)}
-                  className={`w-full ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-none text-slate-300 py-1 outline-none rounded`}
+                  value={BACKGROUND_OPTIONS.slice(0, -1).includes(settings.background) ? settings.background : 'Custom'} 
+                  onChange={(e) => updateSetting('background', e.target.value === 'Custom' ? '' : e.target.value)}
+                  className={`w-full ${isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'} border-none py-1 outline-none rounded`}
                 >
                   {BACKGROUND_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {(!BACKGROUND_OPTIONS.slice(0, -1).includes(settings.background) || settings.background === 'Custom') && (
+                  <input 
+                    type="text"
+                    placeholder="e.g. mountains at sunset"
+                    value={settings.background === 'Custom' ? '' : settings.background}
+                    onChange={(e) => updateSetting('background', e.target.value)}
+                    className={`w-full mt-1 ${isDark ? 'bg-slate-800 text-slate-300 placeholder:text-slate-600' : 'bg-white text-slate-700 border-slate-200'} border rounded px-2 py-1 text-[9px] outline-none`}
+                  />
+                )}
               </div>
+
               <div className="space-y-1">
                 <span className="text-slate-500 uppercase font-bold tracking-tighter">Mood</span>
                 <select 
-                  value={settings.mood} 
-                  onChange={(e) => updateSetting('mood', e.target.value)}
-                  className={`w-full ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-none text-slate-300 py-1 outline-none rounded`}
+                  value={MOOD_OPTIONS.slice(0, -1).includes(settings.mood) ? settings.mood : 'Custom'} 
+                  onChange={(e) => updateSetting('mood', e.target.value === 'Custom' ? '' : e.target.value)}
+                  className={`w-full ${isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'} border-none py-1 outline-none rounded`}
                 >
                   {MOOD_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {(!MOOD_OPTIONS.slice(0, -1).includes(settings.mood) || settings.mood === 'Custom') && (
+                  <input 
+                    type="text"
+                    placeholder="e.g. ecstatic happiness"
+                    value={settings.mood === 'Custom' ? '' : settings.mood}
+                    onChange={(e) => updateSetting('mood', e.target.value)}
+                    className={`w-full mt-1 ${isDark ? 'bg-slate-800 text-slate-300 placeholder:text-slate-600' : 'bg-white text-slate-700 border-slate-200'} border rounded px-2 py-1 text-[9px] outline-none`}
+                  />
+                )}
               </div>
+
               <div className="space-y-1">
                 <span className="text-slate-500 uppercase font-bold tracking-tighter">Ratio</span>
                 <select 
                   value={settings.ratio} 
                   onChange={(e) => updateSetting('ratio', e.target.value)}
-                  className={`w-full ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-none text-slate-300 py-1 outline-none rounded`}
+                  className={`w-full ${isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'} border-none py-1 outline-none rounded`}
                 >
                   {RATIO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               </div>
-              <div className="space-y-1">
+
+              <div className="space-y-1 col-span-2">
                 <span className="text-slate-500 uppercase font-bold tracking-tighter">Pose</span>
                 <select 
-                  value={settings.pose} 
-                  onChange={(e) => updateSetting('pose', e.target.value)}
-                  className={`w-full ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-none text-slate-300 py-1 outline-none rounded`}
+                  value={POSE_OPTIONS.slice(0, -1).includes(settings.pose) ? settings.pose : 'Custom'} 
+                  onChange={(e) => updateSetting('pose', e.target.value === 'Custom' ? '' : e.target.value)}
+                  className={`w-full ${isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'} border-none py-1 outline-none rounded mb-1`}
                 >
                   {POSE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {(!POSE_OPTIONS.slice(0, -1).includes(settings.pose) || settings.pose === 'Custom') && (
+                  <input 
+                    type="text"
+                    placeholder="Describe the pose (e.g., hands crossed, confident stance)"
+                    value={settings.pose === 'Custom' ? '' : settings.pose}
+                    onChange={(e) => updateSetting('pose', e.target.value)}
+                    className={`w-full ${isDark ? 'bg-slate-800 text-slate-300 placeholder:text-slate-600' : 'bg-white text-slate-700 border-slate-200'} border rounded px-2 py-1 text-[9px] outline-none focus:ring-1 focus:ring-teal-500/50`}
+                  />
+                )}
               </div>
             </div>
 

@@ -21,9 +21,11 @@ export interface GenerationSettings {
   shotRange: string;
   styleId: string;
   count: number;
+  weight: string;
+  age: string;
   lighting: string;
   background: string;
-  pose: 'Keep original pose' | 'Slight improvement' | 'Full creative pose';
+  pose: string;
   mood: string;
   ratio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
   quality: 'standard' | 'high' | 'ultra';
