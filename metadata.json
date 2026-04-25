@@ -1,0 +1,6 @@
+{
+  "name": "MasterFace AI",
+  "description": "Professional AI Profile Picture & Self-Portrait Generator with 100% facial identity preservation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["image_generation"]
+}
