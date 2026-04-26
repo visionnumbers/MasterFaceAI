@@ -35,11 +35,61 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
     setSettings({ ...settings, [key]: value });
   };
 
+  const isReferenceMode = settings.mode === 'reference';
+
   return (
     <div className={`w-full min-h-full ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'} border-r flex flex-col p-5 gap-6 transition-colors duration-300 overflow-y-auto custom-scrollbar h-full`}>
       <div className="flex-1 space-y-6">
-        {/* Gender & Shot Range */}
+        {/* Mode Selector */}
         <div className="space-y-3">
+          <label className={`text-[11px] uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'} font-bold`}>Generation Mode</label>
+          <div className={`flex flex-col gap-2 p-1.5 ${isDark ? 'bg-slate-950/50' : 'bg-slate-200/50'} rounded-xl border ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+            <button
+              onClick={() => updateSetting('mode', 'built-in')}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all",
+                settings.mode === 'built-in' 
+                  ? "bg-teal-500 text-slate-950 shadow-lg shadow-teal-500/20 scale-[1.02]" 
+                  : isDark ? "text-slate-500 hover:text-slate-300" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <Palette className="w-4 h-4" />
+              <span>Built-in Styles</span>
+              {settings.mode === 'built-in' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto opacity-70" />}
+            </button>
+            <button
+              onClick={() => updateSetting('mode', 'reference')}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all",
+                settings.mode === 'reference' 
+                  ? "bg-teal-500 text-slate-950 shadow-lg shadow-teal-500/20 scale-[1.02]" 
+                  : isDark ? "text-slate-500 hover:text-slate-300" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <Camera className="w-4 h-4" />
+              <span>Style Reference</span>
+              <span className="text-[8px] px-1.5 py-0.5 bg-slate-800 text-teal-400 rounded-full font-black uppercase tracking-tighter">Ref</span>
+              {settings.mode === 'reference' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto opacity-70" />}
+            </button>
+            <button
+              onClick={() => updateSetting('mode', 'smart-edit')}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all",
+                settings.mode === 'smart-edit' 
+                  ? "bg-teal-500 text-slate-950 shadow-lg shadow-teal-500/20 scale-[1.02]" 
+                  : isDark ? "text-slate-500 hover:text-slate-300" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <Wand2 className="w-4 h-4" />
+              <span>Smart Edit</span>
+              <span className="text-[8px] px-1.5 py-0.5 bg-teal-500/20 text-teal-400 rounded-full font-black uppercase tracking-tighter border border-teal-500/20">AI</span>
+              {settings.mode === 'smart-edit' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto opacity-70" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Gender & Shot Range */}
+        <div className={cn("space-y-3 transition-all", (isReferenceMode || settings.mode === 'smart-edit') && "opacity-40 grayscale pointer-events-none")}>
           <label className={`text-[11px] uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'} font-bold`}>Identity Settings</label>
           <div className={`flex gap-1 p-1 ${isDark ? 'bg-slate-950' : 'bg-slate-200'} rounded-lg`}>
             {(['male', 'female'] as Gender[]).map((g) => (
@@ -47,6 +97,7 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
                 id={`gender-${g}`}
                 key={g}
                 onClick={() => updateSetting('gender', g)}
+                disabled={isReferenceMode}
                 className={cn(
                   "flex-1 py-1.5 text-xs rounded font-medium transition-all",
                   settings.gender === g 
@@ -71,7 +122,7 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
         </div>
 
         {/* Style selection */}
-        <div id="styles-section" className="space-y-3">
+        <div id="styles-section" className={cn("space-y-3 transition-opacity", (isReferenceMode || settings.mode === 'smart-edit') && "opacity-0 invisible pointer-events-none h-0 overflow-hidden")}>
           <button 
             onClick={() => setIsStylesOpen(!isStylesOpen)}
             className="w-full flex items-center justify-between group cursor-pointer"

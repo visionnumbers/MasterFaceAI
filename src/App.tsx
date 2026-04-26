@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Sparkles, Wand2, Info, ChevronRight, History, Heart, X, Zap } from 'lucide-react';
+import { Download, Sparkles, Wand2, Info, ChevronRight, History, Heart, X, Zap, UserCheck, Globe, Palette, Move, Smile } from 'lucide-react';
 import { Header } from './components/Header';
 import { Dropzone } from './components/Dropzone';
 import { GenerationPanel } from './components/GenerationPanel';
@@ -9,7 +9,7 @@ import { ResultsGallery } from './components/ResultsGallery';
 import { Lightbox } from './components/Lightbox';
 import { GenerationSettings, GeneratedImage } from './types';
 import { fileToBase64, cn } from './lib/utils';
-import { analyzeFace, generateProfilePicture } from './services/geminiService';
+import { analyzeFace, analyzeStyleReference, generateProfilePicture } from './services/geminiService';
 import JSZip from 'jszip';
 
 export default function App() {
@@ -18,18 +18,22 @@ export default function App() {
   
   // App state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [styleFile, setStyleFile] = useState<File | null>(null);
   const [isStylesOpen, setIsStylesOpen] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [stylePreviewUrl, setStylePreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationPhase, setGenerationPhase] = useState<string>('');
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [faceDescription, setFaceDescription] = useState<string | null>(null);
+  const [styleDescription, setStyleDescription] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cooldownTime, setCooldownTime] = useState<number>(0);
 
   // Settings state
   const [settings, setSettings] = useState<GenerationSettings>({
+    mode: 'built-in',
     gender: 'male',
     shotRange: 'professional-bust',
     styleId: 'corporate',
@@ -99,6 +103,7 @@ export default function App() {
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setFaceDescription(null);
+    setStyleDescription(null); // Reset style description too for smart edit
     if (file) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
@@ -107,45 +112,91 @@ export default function App() {
     }
   };
 
+  const handleStyleFileSelect = (file: File) => {
+    setStyleFile(file);
+    setStyleDescription(null);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setStylePreviewUrl(url);
+    } else {
+      setStylePreviewUrl(null);
+    }
+  };
+
+  const handleSmartEditAttribute = (attr: any) => {
+    setSettings(prev => ({
+      ...prev,
+      smartEdit: {
+        activeAttribute: attr,
+        value: prev.smartEdit?.activeAttribute === attr ? prev.smartEdit.value : ''
+      }
+    }));
+  };
+
   const handleGenerate = async () => {
     if (!selectedFile || cooldownTime > 0) return;
+    if (settings.mode === 'reference' && !styleFile) {
+      setError('Please upload a style reference photo.');
+      return;
+    }
+    if (settings.mode === 'smart-edit' && (!settings.smartEdit?.activeAttribute || !settings.smartEdit?.value)) {
+      setError('Please select an attribute to edit and provide a description.');
+      return;
+    }
     
     try {
       setIsGenerating(true);
       const base64 = await fileToBase64(selectedFile);
+      const styleBase64 = styleFile ? await fileToBase64(styleFile) : undefined;
       
-      if (!faceDescription) {
+      let currentFaceDesc = faceDescription;
+      if (!currentFaceDesc) {
         setError(null);
-        setGenerationPhase('Analyzing facial geometry...');
-        const description = await analyzeFace(base64);
-        setFaceDescription(description);
-        
-        // Add delay after facial analysis to avoid hitting rate limits too quickly
-        setGenerationPhase('Identity locked. Preparing professional prompts...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        setGenerationPhase('Locking Identity: Analyzing facial geometry...');
+        currentFaceDesc = await analyzeFace(base64);
+        setFaceDescription(currentFaceDesc);
       }
 
-      setGenerationPhase(`Synthesizing ${settings.count} images...`);
+      let currentStyleDesc = styleDescription;
+      // In smart-edit mode, Image 1 is the scene blueprint
+      if (settings.mode === 'smart-edit' && !currentStyleDesc) {
+        setGenerationPhase("Smart Edit: Indexing original scene...");
+        currentStyleDesc = await analyzeStyleReference(base64);
+        setStyleDescription(currentStyleDesc);
+      } else if (settings.mode === 'reference' && styleFile && !currentStyleDesc) {
+        setGenerationPhase("Style Transfer: Deconstructing reference vectors...");
+        const styleBase64ForAnalysis = await fileToBase64(styleFile);
+        currentStyleDesc = await analyzeStyleReference(styleBase64ForAnalysis);
+        setStyleDescription(currentStyleDesc);
+      }
+
+      setGenerationPhase(`Synthesizing ${settings.count} Neural Layers...`);
       
       // Generate images in sequence with a small delay to avoid rate limits
       for (let i = 0; i < settings.count; i++) {
         // Add a small stagger delay between images in a batch to avoid immediate rate limits
         if (i > 0) {
-          setGenerationPhase(`Cooling down... (Next in 5s)`);
+          setGenerationPhase(`Engine Cooling: Ready in 5s...`);
           await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
-        setGenerationPhase(`Generating image ${i + 1} of ${settings.count}...`);
-        const imageUrl = await generateProfilePicture(base64, faceDescription || '', settings);
+        setGenerationPhase(`Rendering Instance ${i + 1} of ${settings.count}...`);
+        const result = await generateProfilePicture(
+          base64, 
+          currentFaceDesc || '', 
+          settings, 
+          styleBase64,
+          currentStyleDesc || undefined
+        );
 
-        if (!imageUrl || typeof imageUrl !== 'string') {
+        if (!result || !result.url) {
           throw new Error("Invalid image data received from generator.");
         }
 
         const newImage: GeneratedImage = {
           id: Math.random().toString(36).substring(7),
-          url: imageUrl,
-          prompt: `Identity lock enabled. Style: ${settings.styleId}. Range: ${settings.shotRange}. Pose: ${settings.pose}.`,
+          url: result.url,
+          prompt: result.prompt,
           styleName: settings.styleId.toUpperCase(),
           ratio: settings.ratio,
           timestamp: Date.now()
@@ -266,45 +317,196 @@ export default function App() {
           
           {/* Top Section: Hero & Reference */}
           <div className="grid grid-cols-12 gap-4 md:gap-6 shrink-0 h-auto min-h-[11rem] md:min-h-[12rem]">
-            <div className="col-span-12 lg:col-span-4 h-full">
-              <Dropzone 
-                onFileSelect={handleFileSelect} 
-                selectedFile={selectedFile} 
-                previewUrl={previewUrl}
-                isDark={isDark}
-              />
-            </div>
-            
-            <div className={`hidden lg:col-span-8 lg:flex flex-col justify-center gap-1 ${isDark ? 'bg-slate-900/30' : 'bg-slate-100'} border-2 border-dashed ${isDark ? 'border-slate-800' : 'border-slate-200'} rounded-2xl px-8 h-full`}>
-              <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} tracking-tight`}>
-                {isGenerating ? "Synthesizing masterpiece..." : "Studio-grade portraits."}
-              </h2>
-              <p className={`text-slate-400 text-[10px] md:text-xs max-w-lg leading-relaxed ${!isDark && 'text-slate-600'}`}>
-                {error ? (
-                  <span className="text-red-400 font-bold">{error}</span>
-                ) : isGenerating ? (
-                  generationPhase
-                ) : (
-                  "Upload a photo to lock your identity. Our AI generates perfect headshots while keeping your features 100% identical."
-                )}
-              </p>
-              <div className="flex gap-3 mt-1">
-                <button 
-                  onClick={() => document.getElementById('dropzone-container')?.click()}
-                  className={`px-3 py-1 ${isDark ? 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-900 border-slate-200 hover:bg-slate-50'} rounded text-[10px] font-bold border transition-colors shadow-sm`}
-                >
-                  {selectedFile ? "REPLACE PHOTO" : "UPLOAD PHOTO"}
-                </button>
-                <button 
-                  disabled={!selectedFile}
-                  onClick={() => handleFileSelect(null as any)}
-                  className={`px-3 py-1 ${isDark ? 'bg-slate-900 border-slate-800 hover:bg-red-500/10' : 'bg-slate-50 border-slate-200 hover:bg-red-50'} text-red-500 rounded text-[10px] border transition-all font-bold disabled:opacity-30 disabled:cursor-not-allowed`}
-                >
-                  CLEAR PHOTO
-                </button>
+            {settings.mode === 'reference' ? (
+              <>
+                <div className="col-span-12 md:col-span-6 h-full space-y-3">
+                  <div className="flex flex-col gap-1 mb-1">
+                    <div className="flex items-center gap-2">
+                       <UserCheck className="w-5 h-5 text-teal-500" />
+                       <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Your Face (Identity Locked)</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Your exact face — 100% identity will be preserved</span>
+                  </div>
+                  <div className="relative group/identity h-[180px]">
+                    <Dropzone 
+                      onFileSelect={handleFileSelect} 
+                      selectedFile={selectedFile} 
+                      previewUrl={previewUrl}
+                      isDark={isDark}
+                    />
+                    {previewUrl && (
+                      <div className="absolute top-3 left-3 flex gap-2">
+                        <div className="px-3 py-1 bg-teal-500 text-slate-950 text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg pointer-events-none">
+                          Identity Source
+                        </div>
+                        {faceDescription && (
+                          <div className="px-3 py-1 bg-slate-900/80 text-teal-400 text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg border border-teal-500/30">
+                            Face Analyzed
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="col-span-12 md:col-span-6 h-full space-y-3">
+                  <div className="flex flex-col gap-1 mb-1">
+                    <div className="flex items-center gap-2">
+                       <Sparkles className="w-5 h-5 text-teal-400" />
+                       <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Style Reference (Face will be replaced)</span>
+                    </div>
+                    <span className="text-[10px] text-teal-600/70 font-bold uppercase">Pose, clothing, lighting & background guide</span>
+                  </div>
+                  <div className="relative group/style h-[180px]">
+                    <Dropzone 
+                      onFileSelect={handleStyleFileSelect} 
+                      selectedFile={styleFile} 
+                      previewUrl={stylePreviewUrl}
+                      isDark={isDark}
+                    />
+                    {stylePreviewUrl && (
+                      <div className="absolute top-3 left-3 flex gap-2">
+                        <div className="px-3 py-1 bg-amber-500 text-slate-950 text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg pointer-events-none">
+                          Style Master
+                        </div>
+                        {styleDescription && (
+                          <div className="px-3 py-1 bg-slate-900/80 text-amber-400 text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg border border-amber-500/30">
+                            Style Mapped
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : settings.mode === 'smart-edit' ? (
+              <div className="col-span-12 h-full flex flex-col md:flex-row gap-6">
+                 <div className="w-full md:w-1/2 h-[240px]">
+                    <div className="flex flex-col gap-1 mb-3">
+                      <div className="flex items-center gap-2">
+                         <UserCheck className="w-5 h-5 text-purple-500" />
+                         <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Upload Photo to Edit (Face Locked)</span>
+                      </div>
+                      <span className="text-[10px] text-purple-600 font-bold uppercase">Only the attribute you select below will change</span>
+                    </div>
+                    <Dropzone 
+                      onFileSelect={handleFileSelect} 
+                      selectedFile={selectedFile} 
+                      previewUrl={previewUrl}
+                      isDark={isDark}
+                    />
+                 </div>
+                 <div className="w-full md:w-1/2 flex flex-col justify-center gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                      {[
+                        { id: 'background', label: 'Change Background', icon: Globe },
+                        { id: 'clothing', label: 'Change Dress', icon: Palette },
+                        { id: 'pose', label: 'Change Pose', icon: Move },
+                        { id: 'lighting', label: 'Change Lighting', icon: Zap },
+                        { id: 'expression', label: 'Change Mood', icon: Smile },
+                      ].map((btn) => (
+                        <button
+                          key={btn.id}
+                          onClick={() => handleSmartEditAttribute(btn.id)}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-3 rounded-xl border transition-all gap-1.5",
+                            settings.smartEdit?.activeAttribute === btn.id
+                              ? "bg-purple-500/20 border-purple-500 text-purple-400"
+                              : "bg-slate-900/50 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300"
+                          )}
+                        >
+                          <btn.icon className="w-4 h-4" />
+                          <span className="text-[9px] font-black uppercase tracking-tighter">{btn.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <AnimatePresence>
+                      {settings.smartEdit?.activeAttribute && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="space-y-2"
+                        >
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                            New {settings.smartEdit.activeAttribute}:
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder={`e.g. ${settings.smartEdit.activeAttribute === 'background' ? 'Cyberpunk city at night' : settings.smartEdit.activeAttribute === 'clothing' ? 'Black leather jacket' : 'Smiling and professional'}`}
+                            value={settings.smartEdit.value || ''}
+                            onChange={(e) => setSettings(prev => ({
+                              ...prev,
+                              smartEdit: { ...prev.smartEdit!, value: e.target.value }
+                            }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-3 text-xs text-white focus:border-purple-500 outline-none transition-all placeholder:text-slate-700"
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="col-span-12 lg:col-span-4 h-full">
+                  <Dropzone 
+                    onFileSelect={handleFileSelect} 
+                    selectedFile={selectedFile} 
+                    previewUrl={previewUrl}
+                    isDark={isDark}
+                  />
+                </div>
+                
+                <div className={`hidden lg:col-span-8 lg:flex flex-col justify-center gap-1 ${isDark ? 'bg-slate-900/30' : 'bg-slate-100'} border-2 border-dashed ${isDark ? 'border-slate-800' : 'border-slate-200'} rounded-2xl px-8 h-full`}>
+                  <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} tracking-tight`}>
+                    {isGenerating ? "Synthesizing masterpiece..." : "Studio-grade portraits."}
+                  </h2>
+                  <p className={`text-slate-400 text-[10px] md:text-xs max-w-lg leading-relaxed ${!isDark && 'text-slate-600'}`}>
+                    {error ? (
+                      <span className="text-red-400 font-bold">{error}</span>
+                    ) : isGenerating ? (
+                      generationPhase
+                    ) : (
+                      "Upload a photo to lock your identity. Our AI generates perfect headshots while keeping your features 100% identical."
+                    )}
+                  </p>
+                  <div className="flex gap-3 mt-1">
+                    <button 
+                      onClick={() => document.getElementById('dropzone-container')?.click()}
+                      className={`px-3 py-1 ${isDark ? 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-900 border-slate-200 hover:bg-slate-50'} rounded text-[10px] font-bold border transition-colors shadow-sm`}
+                    >
+                      {selectedFile ? "REPLACE PHOTO" : "UPLOAD PHOTO"}
+                    </button>
+                    <button 
+                      disabled={!selectedFile}
+                      onClick={() => handleFileSelect(null as any)}
+                      className={`px-3 py-1 ${isDark ? 'bg-slate-900 border-slate-800 hover:bg-red-500/10' : 'bg-slate-50 border-slate-200 hover:bg-red-50'} text-red-500 rounded text-[10px] border transition-all font-bold disabled:opacity-30 disabled:cursor-not-allowed`}
+                    >
+                      CLEAR PHOTO
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
+
+          {settings.mode === 'reference' && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-teal-500/5 border border-teal-500/10 -mt-2">
+              <Info className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+              <p className="text-[10px] text-teal-600/80 font-bold uppercase tracking-wider">
+                Style Reference Mode Active: This mode ignores all built-in styles and uses your reference photo as the master style guide.
+              </p>
+            </div>
+          )}
+
+          {settings.mode === 'smart-edit' && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-500/5 border border-purple-500/10 -mt-2">
+              <Zap className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+              <p className="text-[10px] text-purple-600/80 font-bold uppercase tracking-wider">
+                Smart Edit Mode Active: Select an attribute to change while locking your identity and original scene.
+              </p>
+            </div>
+          )}
 
           {/* Generate Action Area (New) */}
           <div className="flex justify-center -mb-2 relative z-20">
