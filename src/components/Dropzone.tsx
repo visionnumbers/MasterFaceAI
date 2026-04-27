@@ -8,9 +8,10 @@ interface DropzoneProps {
   selectedFile: File | null;
   previewUrl: string | null;
   isDark: boolean;
+  hideLabel?: boolean;
 }
 
-export function Dropzone({ onFileSelect, selectedFile, previewUrl, isDark }: DropzoneProps) {
+export function Dropzone({ onFileSelect, selectedFile, previewUrl, isDark, hideLabel = false }: DropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,9 +60,11 @@ export function Dropzone({ onFileSelect, selectedFile, previewUrl, isDark }: Dro
         className="hidden"
       />
 
-      <span className="absolute top-3 right-3 z-10 px-2 py-0.5 bg-teal-500 text-[10px] font-bold text-slate-950 rounded uppercase tracking-tighter shadow-sm">
-        Reference
-      </span>
+      {!hideLabel && (
+        <span className="absolute top-3 right-3 z-10 px-2 py-0.5 bg-teal-500 text-[10px] font-bold text-slate-950 rounded uppercase tracking-tighter shadow-sm">
+          Reference
+        </span>
+      )}
 
       <div 
         className={cn(

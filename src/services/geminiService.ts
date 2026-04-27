@@ -2,6 +2,25 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { GenerationSettings } from "../types";
 import { CATEGORIES, SHOT_RANGES } from "../constants";
 
+function getStyleBehavior(styleId: string): 'realistic' | 'soft-stylized' | 'hard-stylized' {
+  const hardStylized = [
+    'funko', 'bobblehead', 'chibi', 'lego', 'caricature'
+  ];
+
+  const softStylized = [
+    'pixar', 'anime', 'ghibli', 'comic', 'cartoonify',
+    'clay',
+    'oil-painting', 'watercolor', 'pencil-sketch',
+    'impressionist', 'surreal',
+    'glitch', 'double-exposure', 'hologram'
+  ];
+
+  if (hardStylized.includes(styleId)) return 'hard-stylized';
+  if (softStylized.includes(styleId)) return 'soft-stylized';
+
+  return 'realistic';
+}
+
 // Quota exhaustion still requires checking Gemini API billing/rate-limit dashboard.
 const getAI = () => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -80,7 +99,7 @@ export async function analyzeStyleReference(base64Image: string): Promise<string
       Describe ONLY non-identity visual details:
 
       1. ARTISTIC MEDIUM:
-      - realistic photo / cinematic portrait / anime / 3D / painting / sketch etc.
+      - realistic photo / cinematic portrait / anime / 3D / painting / sketch / comics etc.
 
       2. POSE & BODY LANGUAGE:
       - seated/standing
@@ -149,6 +168,38 @@ export async function analyzeStyleReference(base64Image: string): Promise<string
   });
 }
 
+export async function extractImagePrompt(base64Image: string): Promise<string> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const prompt = `
+      Perform a deep visual analysis of this image and extract a high-quality, extremely detailed prompt that could be used to regenerate this exact image.
+      Include the following details:
+      1. SUBJECT: Detailed description of the person (or main subject), ethnicity, age, hair style, facial features, and expression.
+      2. CLOTHING & ACCESSORIES: Materials, colors, and fit.
+      3. POSE: Exact body and head position.
+      4. STYLE & MEDIUM: Artistic medium (realistic photo, anime, digital art, etc.), camera settings (f-stop, lens mm), and film stock or digital sensor feel.
+      5. LIGHTING: Source, color, intensity, and shadows.
+      6. BACKGROUND: Detailed environment, textures, and depth of field.
+      7. COLOR GRADING: Overall color palette and mood.
+      8. COMPOSITION: Camera angle, framing, and rule of thirds.
+
+      Format as a single, coherent, professional paragraph optimized for an AI image generator.
+    `;
+
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash-lite",
+      contents: {
+        parts: [
+          { inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: "image/jpeg" } },
+          { text: prompt }
+        ]
+      }
+    });
+
+    return result.text || "A high-quality professional portrait.";
+  });
+}
+
 export interface GenerationResult {
   url: string;
   prompt: string;
@@ -188,6 +239,10 @@ export async function generateProfilePicture(
           MODIFICATION TASK:
           - Target Attribute: ${activeAttribute?.toUpperCase()}
           - New Value: ${value}
+          ${activeAttribute === 'baby-face' ? '- Detail: Transform into a baby version of this person while locking core eyes/identity.' : ''}
+          ${activeAttribute === 'rotation' ? '- Detail: Change orientation/viewing angle as specified, adjust 3D perspective.' : ''}
+          ${activeAttribute === 'remove-person' || activeAttribute === 'remove-bg-people' ? '- Detail: Use realistic in-painting to clean the background after removal.' : ''}
+          ${activeAttribute === 'makeup' || activeAttribute === 'teeth' || activeAttribute === 'eye-color' ? '- Detail: Micro-precision edit. Preserve skin texture. Only change target area.' : ''}
           
           EXECUTION:
           - Recreate the exact pose, composition, and quality of Image 1.
@@ -198,6 +253,24 @@ export async function generateProfilePicture(
           OUTPUT: 8k professional quality, realistic, identical face, modified ${activeAttribute}.
           
           NEGATIVE PROMPT: ${settings.negativePrompt}. Do not change the face. Do not change other scene elements.
+        `;
+      } else if (settings.mode === 'extractor' && settings.extractor?.extractedPrompt) {
+        prompt = `
+          [PROMPT RE-GENERATION MODE]:
+          Create a masterpiece image based on this specific prompt: ${settings.extractor.extractedPrompt}
+
+          IDENTITY CONSTRAINT (IMAGE 1):
+          - Description: ${faceDescription}
+          - MANDATORY: Use Image 1 as the EXCLUSIVE identity source for the face. 
+          - Preserve 100% of facial features, skin tone, and unique characteristics from Image 1.
+          
+          IMAGE GENERATION TASK:
+          - Re-interpret the scene described in the prompt but with the person from Image 1.
+          - Maintain the style, lighting, and composition described in: ${settings.extractor.extractedPrompt}
+          
+          OUTPUT: High-resolution masterpiece, cinematic quality, perfect identity lock.
+          
+          NEGATIVE PROMPT: ${settings.negativePrompt}. Avoid face morphing, distorted eyes, extra limbs, or low resolution.
         `;
       } else if (settings.mode === 'reference' && styleDescription) {
         prompt = `
@@ -232,50 +305,163 @@ export async function generateProfilePicture(
           ${settings.negativePrompt}. No style-reference face. No different identity. No missing visible objects from blueprint. No missing visible atmospheric effects from blueprint. No face blending. No identity morphing.
           `;
       } else {
-        // Normal built-in styles mode (unchanged)
+       // Normal built-in styles mode
         const allStyles = CATEGORIES.flatMap(c => c.styles);
         const style = allStyles.find(s => s.id === settings.styleId) || allStyles[0];
+        const styleBehavior = getStyleBehavior(style.id);
         const range = SHOT_RANGES.find(r => r.id === settings.shotRange) || SHOT_RANGES[0];
 
         prompt = `
-        TASK: Generate a NEW high-quality portrait of the SAME PERSON from the reference image.
+          TASK: Generate a NEW high-quality portrait of the SAME PERSON from the reference image.
 
-        IDENTITY (HIGHEST PRIORITY):
-        - Facial Details: ${faceDescription}
-        - Preserve exact face structure, eyes, nose, lips, jawline, skin tone, and recognizable identity.
-        - The final output MUST clearly look like the same person.
-        - Do NOT change identity under any condition.
+          IDENTITY (HIGHEST PRIORITY):
+          ${styleBehavior !== 'hard-stylized' ? `
+          - Facial Details: ${faceDescription}
+          ` : `
+          - Identity Reference: ${faceDescription}
+          - Use this identity reference ONLY as loose likeness guidance.
+          `}
 
-        STYLE & VISUAL CONTROL:
-        - Theme Style: ${style.prompt}
-        - Lighting: ${settings.lighting || 'Soft natural studio'}
-        - Background: ${settings.background || 'Studio plain'}
-        - Mood: ${settings.mood || 'Professional'}
+          ${styleBehavior === 'realistic' ? `
+          - Preserve exact face structure, eyes, nose, lips, jawline, skin tone, and recognizable identity.
+          - The final output MUST clearly look like the same person.
+          - Do NOT change identity under any condition.
+          ` : ''}
 
-        POSE & BODY CONTROL (IMPORTANT):
-        - Pose: ${settings.pose || 'Match natural pose from reference'}
-        - Maintain natural body proportions and posture
-        - Do NOT randomly change pose unless explicitly specified
+          ${styleBehavior === 'soft-stylized' ? `
+          - Preserve recognizable identity but adapt the face into the selected artistic style.
+          - Keep face proportions mostly natural.
+          - Maintain likeness, not strict photorealism.
+          - Do NOT keep the face fully photorealistic if the selected style is artistic or animated.
+          ` : ''}
 
-        SUBJECT ADJUSTMENTS:
-        - Age: ${settings.age || 'Keep original age'}
-        - Body Type: ${settings.weight || 'Keep original body weight'}
+          STYLE & VISUAL CONTROL:
+          - Theme Style: ${style.prompt}
+          - Style Behavior: ${styleBehavior}
+          - Lighting: ${settings.lighting || 'Soft natural studio'}
+          - Lighting Instruction: The lighting must clearly follow this setup, including direction, intensity, and color.
+          - Background: ${settings.background || 'Studio plain'}
+          - Background Instruction: The environment must clearly match this background setting with proper depth, lighting, and context.
+          - Mood / Expression: ${settings.mood || 'Neutral professional'}
+          - Mood Instruction: The facial expression and overall emotional tone must clearly match this mood.
 
-        COMPOSITION:
-        - Shot Type: ${range.name}
-        - Keep framing clean and professional
 
-        QUALITY:
-        - Realistic, sharp focus, professional photography
-        - Clean skin texture, natural lighting
+          STYLE APPLICATION RULE:
+          - Apply the selected style to the entire image, including face, body, clothing, background, lighting, and rendering.
 
-        NEGATIVE PROMPT:
-        ${settings.negativePrompt}
-        - No identity change
-        - No face morphing
-        - No distorted eyes or face
-        - No unnatural pose change
-        `;
+          ${styleBehavior === 'realistic' ? `
+          - Keep the face fully realistic and natural.
+          - Preserve real-world face proportions and skin texture.
+          - Do NOT stylize, simplify, cartoonify, or exaggerate facial features.
+          ` : ''}
+
+          ${styleBehavior === 'soft-stylized' ? `
+          - Adapt the face into the selected style.
+          - Keep proportions mostly realistic, but apply the artistic medium clearly.
+          - The face should look painted/animated/illustrated when the selected style requires it.
+          - Identity must remain recognizable through face shape, eye spacing, skin tone, and key features.
+          ` : ''}
+
+          ${styleBehavior === 'hard-stylized' ? `
+          HARD STYLIZATION MODE (MANDATORY):
+
+          - This is NOT a real human portrait.
+          - This is a stylized character/figure representation.
+
+          - Completely override realistic human appearance.
+          - Transform the subject into a fully stylized character or toy figure.
+
+          FACIAL TRANSFORMATION:
+          - Simplify facial features.
+          - Remove realistic skin texture.
+          - Apply stylized geometry: rounded, flat, toy-like, exaggerated, or simplified forms.
+          - Do NOT preserve detailed human facial realism.
+
+          IDENTITY RULE:
+          - Use identity ONLY as loose resemblance.
+          - Preserve:
+            → overall face shape
+            → eye placement
+            → hairstyle
+            → mustache/beard pattern
+            → skin-tone family
+          - Do NOT preserve realistic pores, realistic skin texture, or photographic facial detail.
+
+          STYLE CONSISTENCY:
+          - Face and body MUST match the same stylized system.
+          - No hybrid output allowed: never combine a realistic face with stylized body.
+          - The full subject must match the selected style: ${style.prompt}
+
+          FINAL OUTPUT MUST:
+          - Look like a designed character or collectible figure, not a photograph.
+          - Be fully stylized, not semi-realistic.
+          ` : ''}
+
+          POSE & BODY CONTROL:
+          - Pose: ${settings.pose || 'Match natural pose from reference'}
+          - Pose Instruction: The subject must clearly follow this pose naturally and realistically.
+          - Maintain body proportions according to Style Behavior.
+          - Do NOT randomly change pose unless explicitly specified.
+
+          SUBJECT ADJUSTMENTS:
+          - Age: ${settings.age || 'Keep original age'}
+          - Body Type: ${settings.weight || 'Keep original body weight'}
+
+          COMPOSITION:
+          - Shot Type: ${range.name}
+          - Shot Description: ${range.description}
+          - Keep framing clean and professional.
+
+          QUALITY:
+          - High-quality output matching the selected style.
+          - Sharp and clean facial rendering.
+
+          ${styleBehavior === 'realistic' ? `
+          - Clean natural skin texture.
+          - Realistic professional lighting.
+          ` : ''}
+
+          ${styleBehavior === 'soft-stylized' ? `
+          - Clean stylized rendering.
+          - Consistent artistic texture across face and background.
+          ` : ''}
+
+          ${styleBehavior === 'hard-stylized' ? `
+          - Clean character/figure rendering.
+          - Consistent stylized material and proportions across face and body.
+          ` : ''}
+
+          NEGATIVE PROMPT:
+          ${settings.negativePrompt}
+          - No identity drift
+          - No distorted eyes or broken face
+          - No random pose change
+          - No mixing of multiple styles
+
+          ${styleBehavior === 'realistic' ? `
+          - No cartoon face
+          - No exaggerated proportions
+          - No toy-like body
+          ` : ''}
+
+          ${styleBehavior === 'soft-stylized' ? `
+          - No fully photorealistic face
+          - No realistic face pasted onto stylized background
+          - No mismatch between face style and scene style
+          ` : ''}
+
+          ${styleBehavior === 'hard-stylized' ? `
+          - No realistic human face
+          - No photorealistic skin
+          - No realistic facial rendering
+          - No detailed pores or skin texture
+          - No high-detail human face
+          - No semi-realistic hybrid output
+          - No normal human body proportions
+          - No realistic face pasted onto toy/cartoon body
+          - No mismatch between face and body style
+          ` : ''}
+          `;
       }
 
       const parts: any[] = [

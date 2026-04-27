@@ -85,11 +85,25 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
               <span className="text-[8px] px-1.5 py-0.5 bg-teal-500/20 text-teal-400 rounded-full font-black uppercase tracking-tighter border border-teal-500/20">AI</span>
               {settings.mode === 'smart-edit' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto opacity-70" />}
             </button>
+            <button
+              onClick={() => updateSetting('mode', 'extractor')}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all",
+                settings.mode === 'extractor' 
+                  ? "bg-teal-500 text-slate-950 shadow-lg shadow-teal-500/20 scale-[1.02]" 
+                  : isDark ? "text-slate-500 hover:text-slate-300" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Prompt Extractor</span>
+              <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded-full font-black uppercase tracking-tighter border border-purple-500/20">Vision</span>
+              {settings.mode === 'extractor' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto opacity-70" />}
+            </button>
           </div>
         </div>
 
         {/* Gender & Shot Range */}
-        <div className={cn("space-y-3 transition-all", (isReferenceMode || settings.mode === 'smart-edit') && "opacity-40 grayscale pointer-events-none")}>
+        <div className={cn("space-y-3 transition-all", (isReferenceMode || settings.mode === 'smart-edit' || settings.mode === 'extractor') && "opacity-40 grayscale pointer-events-none")}>
           <label className={`text-[11px] uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'} font-bold`}>Identity Settings</label>
           <div className={`flex gap-1 p-1 ${isDark ? 'bg-slate-950' : 'bg-slate-200'} rounded-lg`}>
             {(['male', 'female'] as Gender[]).map((g) => (
@@ -97,7 +111,7 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
                 id={`gender-${g}`}
                 key={g}
                 onClick={() => updateSetting('gender', g)}
-                disabled={isReferenceMode}
+                disabled={isReferenceMode || settings.mode === 'extractor'}
                 className={cn(
                   "flex-1 py-1.5 text-xs rounded font-medium transition-all",
                   settings.gender === g 
@@ -113,6 +127,7 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
             id="shot-range-select"
             value={settings.shotRange}
             onChange={(e) => updateSetting('shotRange', e.target.value)}
+            disabled={settings.mode === 'extractor'}
             className={`w-full ${isDark ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700'} border rounded-lg px-3 py-2 text-xs outline-none focus:border-teal-500 transition-colors`}
           >
             {SHOT_RANGES.map((r) => (
@@ -122,7 +137,7 @@ export function GenerationPanel({ settings, setSettings, onGenerate, disabled, i
         </div>
 
         {/* Style selection */}
-        <div id="styles-section" className={cn("space-y-3 transition-opacity", (isReferenceMode || settings.mode === 'smart-edit') && "opacity-0 invisible pointer-events-none h-0 overflow-hidden")}>
+        <div id="styles-section" className={cn("space-y-3 transition-opacity", (isReferenceMode || settings.mode === 'smart-edit' || settings.mode === 'extractor') && "opacity-0 invisible pointer-events-none h-0 overflow-hidden")}>
           <button 
             onClick={() => setIsStylesOpen(!isStylesOpen)}
             className="w-full flex items-center justify-between group cursor-pointer"

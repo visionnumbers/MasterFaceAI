@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Sparkles, Wand2, Info, ChevronRight, History, Heart, X, Zap, UserCheck, Globe, Palette, Move, Smile } from 'lucide-react';
+import { Download, Sparkles, Wand2, Info, ChevronRight, History, Heart, X, Zap, UserCheck, Globe, Palette, Move, Smile, Scissors, Glasses, Frame, Brush, UserCircle, Image as ImageIcon, Camera, RotateCw, Sparkle, Wind, Eye, Users, Baby, Tent, Trash2, Ghost } from 'lucide-react';
 import { Header } from './components/Header';
 import { Dropzone } from './components/Dropzone';
 import { GenerationPanel } from './components/GenerationPanel';
 import { AdvancedPanel } from './components/AdvancedPanel';
 import { ResultsGallery } from './components/ResultsGallery';
 import { Lightbox } from './components/Lightbox';
+import { ImagePromptExtractor } from './components/ImagePromptExtractor';
 import { GenerationSettings, GeneratedImage } from './types';
 import { fileToBase64, cn } from './lib/utils';
 import { analyzeFace, analyzeStyleReference, generateProfilePicture } from './services/geminiService';
 import JSZip from 'jszip';
+import { SHOT_RANGES, SMART_EDIT_OPTIONS } from './constants';
+
+const SMART_EDIT_ICONS: Record<string, any> = {
+  Globe, Palette, Move, Zap, Smile, Brush, Sparkle, Eye, Camera, Scissors, UserCircle, Baby, Wind, Trash2, Users, ImageIcon, RotateCw, Glasses, Ghost
+};
 
 export default function App() {
   // Theme state
@@ -133,20 +139,43 @@ export default function App() {
     }));
   };
 
-  const handleGenerate = async () => {
-    if (!selectedFile || cooldownTime > 0) return;
-    if (settings.mode === 'reference' && !styleFile) {
+  const handleGenerateFromExtractor = async (prompt: string, imageFile: File) => {
+    // Sync state before generate
+    setSelectedFile(imageFile);
+    setSettings(prev => ({
+      ...prev,
+      mode: 'extractor',
+      count: 4, // 4 variations as requested
+      extractor: {
+        extractedPrompt: prompt,
+        isExtracted: true
+      }
+    }));
+    
+    // We need to wait for state to update or just call with local values
+    // Since handleGenerate uses state, we can try to call it in next tick or just copy-paste logic
+    // For simplicity, let's call handleGenerate and rely on state being mostly correct or pass params
+  };
+
+  // Improved handleGenerate to accept optional overrides
+  const handleGenerate = async (overrides?: Partial<GenerationSettings>, overrideFile?: File, overridePrompt?: string) => {
+    const activeFile = overrideFile || selectedFile;
+    if (!activeFile || cooldownTime > 0) return;
+    
+    const activeSettings = overrides ? { ...settings, ...overrides } : settings;
+
+    if (activeSettings.mode === 'reference' && !styleFile) {
       setError('Please upload a style reference photo.');
       return;
     }
-    if (settings.mode === 'smart-edit' && (!settings.smartEdit?.activeAttribute || !settings.smartEdit?.value)) {
+    if (activeSettings.mode === 'smart-edit' && (!activeSettings.smartEdit?.activeAttribute || !activeSettings.smartEdit?.value)) {
       setError('Please select an attribute to edit and provide a description.');
       return;
     }
     
     try {
       setIsGenerating(true);
-      const base64 = await fileToBase64(selectedFile);
+      const base64 = await fileToBase64(activeFile);
       const styleBase64 = styleFile ? await fileToBase64(styleFile) : undefined;
       
       let currentFaceDesc = faceDescription;
@@ -159,32 +188,32 @@ export default function App() {
 
       let currentStyleDesc = styleDescription;
       // In smart-edit mode, Image 1 is the scene blueprint
-      if (settings.mode === 'smart-edit' && !currentStyleDesc) {
+      if (activeSettings.mode === 'smart-edit' && !currentStyleDesc) {
         setGenerationPhase("Smart Edit: Indexing original scene...");
         currentStyleDesc = await analyzeStyleReference(base64);
         setStyleDescription(currentStyleDesc);
-      } else if (settings.mode === 'reference' && styleFile && !currentStyleDesc) {
+      } else if (activeSettings.mode === 'reference' && styleFile && !currentStyleDesc) {
         setGenerationPhase("Style Transfer: Deconstructing reference vectors...");
         const styleBase64ForAnalysis = await fileToBase64(styleFile);
         currentStyleDesc = await analyzeStyleReference(styleBase64ForAnalysis);
         setStyleDescription(currentStyleDesc);
       }
 
-      setGenerationPhase(`Synthesizing ${settings.count} Neural Layers...`);
+      setGenerationPhase(`Synthesizing ${activeSettings.count} Neural Layers...`);
       
       // Generate images in sequence with a small delay to avoid rate limits
-      for (let i = 0; i < settings.count; i++) {
+      for (let i = 0; i < activeSettings.count; i++) {
         // Add a small stagger delay between images in a batch to avoid immediate rate limits
         if (i > 0) {
           setGenerationPhase(`Engine Cooling: Ready in 5s...`);
           await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
-        setGenerationPhase(`Rendering Instance ${i + 1} of ${settings.count}...`);
+        setGenerationPhase(`Rendering Instance ${i + 1} of ${activeSettings.count}...`);
         const result = await generateProfilePicture(
           base64, 
           currentFaceDesc || '', 
-          settings, 
+          activeSettings, 
           styleBase64,
           currentStyleDesc || undefined
         );
@@ -197,15 +226,15 @@ export default function App() {
           id: Math.random().toString(36).substring(7),
           url: result.url,
           prompt: result.prompt,
-          styleName: settings.styleId.toUpperCase(),
-          ratio: settings.ratio,
+          styleName: activeSettings.mode.toUpperCase(),
+          ratio: activeSettings.ratio,
           timestamp: Date.now()
         };
 
         setGeneratedImages(prev => [newImage, ...prev]);
 
         // Add a 3s delay between requests to avoid hitting rate limits for the 1000/day quota
-        if (i < settings.count - 1) {
+        if (i < activeSettings.count - 1) {
           await new Promise(resolve => setTimeout(resolve, 3500));
         }
       }
@@ -352,7 +381,7 @@ export default function App() {
                   <div className="flex flex-col gap-1 mb-1">
                     <div className="flex items-center gap-2">
                        <Sparkles className="w-5 h-5 text-teal-400" />
-                       <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Style Reference (Face will be replaced)</span>
+                       <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Style Reference</span>
                     </div>
                     <span className="text-[10px] text-teal-600/70 font-bold uppercase">Pose, clothing, lighting & background guide</span>
                   </div>
@@ -379,72 +408,163 @@ export default function App() {
                 </div>
               </>
             ) : settings.mode === 'smart-edit' ? (
-              <div className="col-span-12 h-full flex flex-col md:flex-row gap-6">
-                 <div className="w-full md:w-1/2 h-[240px]">
-                    <div className="flex flex-col gap-1 mb-3">
-                      <div className="flex items-center gap-2">
-                         <UserCheck className="w-5 h-5 text-purple-500" />
-                         <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Upload Photo to Edit (Face Locked)</span>
+              <div className="col-span-12 h-full flex flex-col gap-6">
+                 {/* Top Row: Photo Upload & Prompt View */}
+                 <div className="flex flex-col md:flex-row gap-6 h-auto md:h-[240px]">
+                   <div className="w-full md:w-1/2 h-full">
+                      <div className="flex flex-col gap-1 mb-3">
+                        <div className="flex items-center gap-2">
+                           <UserCheck className="w-5 h-5 text-purple-500" />
+                           <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Source Photo (Face Locked)</span>
+                        </div>
+                        <span className="text-[10px] text-purple-600 font-bold uppercase">Base identity and scene mapping</span>
                       </div>
-                      <span className="text-[10px] text-purple-600 font-bold uppercase">Only the attribute you select below will change</span>
-                    </div>
-                    <Dropzone 
-                      onFileSelect={handleFileSelect} 
-                      selectedFile={selectedFile} 
-                      previewUrl={previewUrl}
-                      isDark={isDark}
-                    />
-                 </div>
-                 <div className="w-full md:w-1/2 flex flex-col justify-center gap-4">
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                      {[
-                        { id: 'background', label: 'Change Background', icon: Globe },
-                        { id: 'clothing', label: 'Change Dress', icon: Palette },
-                        { id: 'pose', label: 'Change Pose', icon: Move },
-                        { id: 'lighting', label: 'Change Lighting', icon: Zap },
-                        { id: 'expression', label: 'Change Mood', icon: Smile },
-                      ].map((btn) => (
-                        <button
-                          key={btn.id}
-                          onClick={() => handleSmartEditAttribute(btn.id)}
-                          className={cn(
-                            "flex flex-col items-center justify-center p-3 rounded-xl border transition-all gap-1.5",
-                            settings.smartEdit?.activeAttribute === btn.id
-                              ? "bg-purple-500/20 border-purple-500 text-purple-400"
-                              : "bg-slate-900/50 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300"
-                          )}
-                        >
-                          <btn.icon className="w-4 h-4" />
-                          <span className="text-[9px] font-black uppercase tracking-tighter">{btn.label}</span>
-                        </button>
-                      ))}
-                    </div>
+                      <Dropzone 
+                        onFileSelect={handleFileSelect} 
+                        selectedFile={selectedFile} 
+                        previewUrl={previewUrl}
+                        isDark={isDark}
+                        hideLabel={true}
+                      />
+                   </div>
+                   
+                   <div className="w-full md:w-1/2 flex flex-col justify-end">
+                      <AnimatePresence mode="wait">
+                        {settings.smartEdit?.activeAttribute ? (
+                          <motion.div
+                            key={settings.smartEdit.activeAttribute}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="space-y-4 bg-slate-900/60 p-6 rounded-3xl border border-slate-800/50 backdrop-blur-md shadow-2xl relative overflow-hidden"
+                          >
+                            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                               <Wand2 className="w-32 h-32 text-purple-500" />
+                            </div>
 
-                    <AnimatePresence>
-                      {settings.smartEdit?.activeAttribute && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          className="space-y-2"
-                        >
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                            New {settings.smartEdit.activeAttribute}:
-                          </label>
-                          <input 
-                            type="text"
-                            placeholder={`e.g. ${settings.smartEdit.activeAttribute === 'background' ? 'Cyberpunk city at night' : settings.smartEdit.activeAttribute === 'clothing' ? 'Black leather jacket' : 'Smiling and professional'}`}
-                            value={settings.smartEdit.value || ''}
-                            onChange={(e) => setSettings(prev => ({
-                              ...prev,
-                              smartEdit: { ...prev.smartEdit!, value: e.target.value }
-                            }))}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-3 text-xs text-white focus:border-purple-500 outline-none transition-all placeholder:text-slate-700"
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                            <div className="flex items-center justify-between relative z-10">
+                              <div className="flex items-center gap-3">
+                                 <div className="p-2 bg-purple-500/20 rounded-xl">
+                                    {(() => {
+                                      const btn = SMART_EDIT_OPTIONS.flatMap(c => c.items).find(i => i.id === settings.smartEdit?.activeAttribute);
+                                      const Icon = btn?.icon ? SMART_EDIT_ICONS[btn.icon as string] : Sparkles;
+                                      return Icon ? <Icon className="w-5 h-5 text-purple-400" /> : <Sparkles className="w-5 h-5 text-purple-400" />;
+                                    })()}
+                                 </div>
+                                 <div>
+                                   <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest block">
+                                      Editing {settings.smartEdit.activeAttribute.replace('-', ' ')}
+                                   </label>
+                                   <span className="text-[8px] text-slate-500 font-bold uppercase">Precision Neural Mapping</span>
+                                 </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3 relative z-10">
+                              <div className="flex flex-wrap gap-2">
+                                {SMART_EDIT_OPTIONS.flatMap(c => c.items)
+                                  .find(i => i.id === settings.smartEdit?.activeAttribute)?.presets?.map(preset => (
+                                    <button
+                                      key={preset}
+                                      onClick={() => setSettings(prev => ({
+                                        ...prev,
+                                        smartEdit: { ...prev.smartEdit!, value: preset }
+                                      }))}
+                                      className={cn(
+                                        "px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-tighter transition-all",
+                                        settings.smartEdit?.value === preset
+                                          ? "bg-purple-500 text-white shadow-lg shadow-purple-500/20"
+                                          : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                      )}
+                                    >
+                                      {preset}
+                                    </button>
+                                  ))}
+                              </div>
+
+                              <div className="relative">
+                                <input 
+                                  type="text"
+                                  placeholder="Or type custom instruction..."
+                                  value={settings.smartEdit.value || ''}
+                                  onChange={(e) => setSettings(prev => ({
+                                    ...prev,
+                                    smartEdit: { ...prev.smartEdit!, value: e.target.value }
+                                  }))}
+                                  className="w-full bg-slate-950/80 border border-slate-800 rounded-2xl px-5 py-4 text-xs text-white focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 outline-none transition-all placeholder:text-slate-700 font-medium"
+                                />
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                   <Sparkles className="w-4 h-4 text-purple-500/30" />
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-900/20 border-2 border-dashed border-slate-800/50 rounded-3xl text-center">
+                             <Wand2 className="w-12 h-12 text-slate-700 mb-4 animate-pulse" />
+                             <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Select an attribute below</h3>
+                             <p className="text-[10px] text-slate-600 mt-2 font-bold uppercase tracking-widest">To begin precision editing</p>
+                          </div>
+                        )}
+                      </AnimatePresence>
+                   </div>
                  </div>
+
+                 {/* Bottom Grid: Attribute Selector Categories */}
+                 <div className="space-y-6">
+                    {SMART_EDIT_OPTIONS.map((category) => (
+                      <div key={category.category} className="space-y-3">
+                        <div className="flex items-center gap-3 px-1">
+                           <div className="h-[1px] flex-1 bg-slate-900" />
+                           <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] whitespace-nowrap">{category.category}</h4>
+                           <div className="h-[1px] flex-1 bg-slate-900" />
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                           {category.items.map((btn) => (
+                             <button
+                               key={btn.id}
+                               onClick={() => handleSmartEditAttribute(btn.id)}
+                               className={cn(
+                                 "flex flex-col items-center justify-center p-4 rounded-2xl border transition-all gap-2 group/btn",
+                                 settings.smartEdit?.activeAttribute === btn.id
+                                   ? "bg-purple-500/20 border-purple-500 shadow-xl shadow-purple-500/10 scale-[1.02]"
+                                   : "bg-slate-900/40 border-slate-800/50 text-slate-500 hover:border-slate-700 hover:bg-slate-800/80 hover:scale-[1.02]"
+                               )}
+                             >
+                               <div className={cn(
+                                 "p-2 rounded-xl transition-colors",
+                                 settings.smartEdit?.activeAttribute === btn.id ? "bg-purple-500/20" : "bg-slate-950/50 group-hover/btn:bg-slate-900"
+                               )}>
+                                 {(() => {
+                                   const Icon = SMART_EDIT_ICONS[btn.icon as string] || Sparkles;
+                                   return <Icon className={cn("w-4 h-4", settings.smartEdit?.activeAttribute === btn.id ? "text-purple-400" : btn.color)} />;
+                                 })()}
+                               </div>
+                               <span className={cn(
+                                 "text-[9px] font-black uppercase tracking-tighter text-center leading-tight",
+                                 settings.smartEdit?.activeAttribute === btn.id ? "text-purple-300" : "text-slate-400"
+                               )}>{btn.label}</span>
+                             </button>
+                           ))}
+                        </div>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+            ) : settings.mode === 'extractor' ? (
+              <div className="col-span-12 h-full">
+                <ImagePromptExtractor 
+                  isDark={isDark} 
+                  isGenerating={isGenerating}
+                  imageCount={settings.count}
+                  onGenerateVariations={(prompt, file) => {
+                    handleGenerate({
+                      mode: 'extractor',
+                      count: settings.count,
+                      extractor: { extractedPrompt: prompt, isExtracted: true }
+                    }, file);
+                  }}
+                />
               </div>
             ) : (
               <>
@@ -508,8 +628,17 @@ export default function App() {
             </div>
           )}
 
+          {settings.mode === 'extractor' && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-500/5 border border-purple-500/10 -mt-2">
+              <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+              <p className="text-[10px] text-purple-600/80 font-bold uppercase tracking-wider">
+                Prompt Extractor Active: Upload an image to analyze its visual DNA and generate variations.
+              </p>
+            </div>
+          )}
+
           {/* Generate Action Area (New) */}
-          <div className="flex justify-center -mb-2 relative z-20">
+          <div className={cn("flex justify-center -mb-2 relative z-20", settings.mode === 'extractor' && "hidden")}>
             <button
               id="main-generate-button"
               disabled={!selectedFile || isGenerating}

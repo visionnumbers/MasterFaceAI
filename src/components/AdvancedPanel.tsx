@@ -24,6 +24,7 @@ interface AdvancedPanelProps {
 export function AdvancedPanel({ settings, setSettings, isDark }: AdvancedPanelProps) {
   const isReferenceMode = settings.mode === 'reference';
   const isSmartEditMode = settings.mode === 'smart-edit';
+  const isExtractorMode = settings.mode === 'extractor';
 
   const updateSetting = (key: keyof GenerationSettings, value: any) => {
     setSettings({ ...settings, [key]: value });
@@ -66,7 +67,7 @@ export function AdvancedPanel({ settings, setSettings, isDark }: AdvancedPanelPr
               </div>
             </div>
 
-            {(!isReferenceMode && !isSmartEditMode) && (
+            {(!isReferenceMode && !isSmartEditMode && !isExtractorMode) && (
               <div className="grid grid-cols-2 gap-3 text-[10px]">
                 {/* Weight control */}
                 <div className="space-y-1">
@@ -192,17 +193,21 @@ export function AdvancedPanel({ settings, setSettings, isDark }: AdvancedPanelPr
               </div>
             )}
 
-            {(isReferenceMode || isSmartEditMode) && (
+            {(isReferenceMode || isSmartEditMode || isExtractorMode) && (
               <div className={cn(
                 "p-3 rounded-lg border mb-2",
-                isSmartEditMode ? "bg-purple-500/5 border-purple-500/10" : "bg-teal-500/5 border-teal-500/10"
+                isSmartEditMode ? "bg-purple-500/5 border-purple-500/10" : 
+                isExtractorMode ? "bg-purple-500/5 border-purple-500/10" : 
+                "bg-teal-500/5 border-teal-500/10"
               )}>
                 <p className={cn(
                   "text-[10px] font-bold uppercase tracking-wider text-center",
-                  isSmartEditMode ? "text-purple-600/80" : "text-teal-600/80"
+                  (isSmartEditMode || isExtractorMode) ? "text-purple-600/80" : "text-teal-600/80"
                 )}>
                    {isSmartEditMode 
                     ? "Smart Edit Mode Active: Overrides disabled to ensure clean attribute modification." 
+                    : isExtractorMode 
+                    ? "Prompt Extractor Mode Active: Uses visual analysis for style & scene generation."
                     : "Identity Locked. Style Fixed to Reference."}
                 </p>
               </div>

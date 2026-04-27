@@ -14,13 +14,23 @@ export interface Category {
 
 export type Gender = 'male' | 'female' | 'unisex';
 
-export type GenerationMode = 'built-in' | 'reference' | 'smart-edit';
+export type GenerationMode = 'built-in' | 'reference' | 'smart-edit' | 'extractor';
 
 export type ShotRange = string;
 
 export interface SmartEditSettings {
-  activeAttribute: 'background' | 'clothing' | 'pose' | 'lighting' | 'expression' | null;
+  activeAttribute: 
+    | 'background' | 'clothing' | 'pose' | 'lighting' | 'expression' 
+    | 'hair' | 'accessories' | 'age' | 'style' | 'facial-hair'
+    | 'scene' | 'rotation' | 'makeup' | 'teeth' | 'eye-color' 
+    | 'eyes-open' | 'remove-person' | 'multi-clothing' 
+    | 'remove-bg-people' | 'baby-face' | 'tattoo' | 'bald' | null;
   value: string;
+}
+
+export interface ExtractorSettings {
+  extractedPrompt: string;
+  isExtracted: boolean;
 }
 
 export interface GenerationSettings {
@@ -39,6 +49,7 @@ export interface GenerationSettings {
   quality: 'standard' | 'high' | 'ultra';
   negativePrompt: string;
   smartEdit?: SmartEditSettings;
+  extractor?: ExtractorSettings;
 }
 
 export interface GeneratedImage {
