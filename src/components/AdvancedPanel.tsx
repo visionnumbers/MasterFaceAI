@@ -25,6 +25,10 @@ export function AdvancedPanel({ settings, setSettings, isDark }: AdvancedPanelPr
   const isReferenceMode = settings.mode === 'reference';
   const isSmartEditMode = settings.mode === 'smart-edit';
   const isExtractorMode = settings.mode === 'extractor';
+  const isProductShotMode = settings.mode === 'product-shot';
+  const isCreatorMode = settings.mode === 'creator';
+  const isKidsZoneMode = settings.mode === 'kids-zone';
+  const isTextToImageMode = settings.mode === 'text-to-image';
 
   const updateSetting = (key: keyof GenerationSettings, value: any) => {
     setSettings({ ...settings, [key]: value });
@@ -50,7 +54,7 @@ export function AdvancedPanel({ settings, setSettings, isDark }: AdvancedPanelPr
                 <span className="text-[10px] uppercase font-bold tracking-tighter">Number of images</span>
               </div>
               <div className={`flex gap-1 ${isDark ? 'bg-slate-900' : 'bg-slate-100'} p-1 rounded-md`}>
-                {BATCH_COUNTS.map((c) => (
+                {(isCreatorMode || isKidsZoneMode || isTextToImageMode ? [1, 2, 4] : BATCH_COUNTS).map((c) => (
                   <button
                     key={c}
                     onClick={() => updateSetting('count', c)}
@@ -67,7 +71,7 @@ export function AdvancedPanel({ settings, setSettings, isDark }: AdvancedPanelPr
               </div>
             </div>
 
-            {(!isReferenceMode && !isSmartEditMode && !isExtractorMode) && (
+            {(!isReferenceMode && !isSmartEditMode && !isExtractorMode && !isProductShotMode && !isCreatorMode && !isKidsZoneMode && !isTextToImageMode) && (
               <div className="grid grid-cols-2 gap-3 text-[10px]">
                 {/* Weight control */}
                 <div className="space-y-1">
@@ -193,21 +197,36 @@ export function AdvancedPanel({ settings, setSettings, isDark }: AdvancedPanelPr
               </div>
             )}
 
-            {(isReferenceMode || isSmartEditMode || isExtractorMode) && (
+            {(isReferenceMode || isSmartEditMode || isExtractorMode || isProductShotMode || isCreatorMode || isKidsZoneMode || isTextToImageMode) && (
               <div className={cn(
                 "p-3 rounded-lg border mb-2",
                 isSmartEditMode ? "bg-purple-500/5 border-purple-500/10" : 
                 isExtractorMode ? "bg-purple-500/5 border-purple-500/10" : 
+                isProductShotMode ? "bg-blue-500/5 border-blue-500/10" :
+                isCreatorMode ? "bg-indigo-500/5 border-indigo-500/10" :
+                isKidsZoneMode ? "bg-purple-500/5 border-purple-500/10" :
+                isTextToImageMode ? "bg-blue-500/5 border-blue-500/10" :
                 "bg-teal-500/5 border-teal-500/10"
               )}>
                 <p className={cn(
                   "text-[10px] font-bold uppercase tracking-wider text-center",
-                  (isSmartEditMode || isExtractorMode) ? "text-purple-600/80" : "text-teal-600/80"
+                  (isSmartEditMode || isExtractorMode || isKidsZoneMode) ? "text-purple-600/80" : 
+                  (isProductShotMode || isTextToImageMode) ? "text-blue-600/80" :
+                  isCreatorMode ? "text-indigo-600/80" :
+                  "text-teal-600/80"
                 )}>
                    {isSmartEditMode 
                     ? "Smart Edit Mode Active: Overrides disabled to ensure clean attribute modification." 
                     : isExtractorMode 
                     ? "Prompt Extractor Mode Active: Uses visual analysis for style & scene generation."
+                    : isProductShotMode
+                    ? "Product Shot Mode Active: Commercial photography engine engaged."
+                    : isCreatorMode
+                    ? "Creator Mode Active: Specialized tools for professional asset design."
+                    : isKidsZoneMode
+                    ? "Kids Zone Mode Active: Creating magical educational activities for children."
+                    : isTextToImageMode
+                    ? "Text to Image Mode Active: Generative art engine powered by your descriptions."
                     : "Identity Locked. Style Fixed to Reference."}
                 </p>
               </div>

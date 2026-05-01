@@ -1,4 +1,4 @@
-import { Category } from './types';
+import { Category, ProductShotCategory, CreatorTool, KidsActivity } from './types';
 
 export const CATEGORIES: Category[] = [
   {
@@ -525,6 +525,45 @@ export const SMART_EDIT_OPTIONS = [
     ]
   }
 ];
+
+export const PRODUCT_SHOT_FEATURES: ProductShotCategory[] = [
+  {
+    category: 'Essentials',
+    items: [
+      { id: 'lifestyle', label: 'Product Lifestyle', description: 'Place your product in a realistic lifestyle setting with human interaction like hands holding or natural usage.', icon: 'Camera', color: 'text-blue-400', presets: ['Hands holding product', 'Person using naturally', 'Worn or carried', 'In home environment', 'Office/work setting', 'Outdoor activity', 'Social setting', 'Sports/fitness use', 'Cafe/restaurant', 'Travel/commute'] },
+      { id: 'jewelry', label: 'Jewelry on Person', description: 'Showcase jewelry worn by a professional model with realistic lighting and gemstones.', icon: 'Sparkles', color: 'text-yellow-400', presets: ['Gold Necklace', 'Diamond Ring', 'Elegant Earrings', 'Silver Bracelet', 'Luxury Watch'] },
+      { id: 'logo-apparel', label: 'Apply Logo/T-Shirt', description: 'Upload your logo design and display it on a T-shirt. Choose between white, grey, or black T-shirts for men or women.', icon: 'BadgeCheck', color: 'text-purple-400', presets: ['White T-shirt (Men)', 'Grey T-shirt (Men)', 'Black T-shirt (Men)', 'White T-shirt (Women)', 'Grey T-shirt (Women)', 'Black T-shirt (Women)'] },
+      { id: 'color-change', label: 'Change Color', description: 'Change the color of any product or object while preserving its original texture and shadows.', icon: 'Palette', color: 'text-pink-400', presets: ['Ruby Red', 'Midnight Blue', 'Jet Black', 'Pure White', 'Emerald Green', 'Matte Gold'] },
+      { id: 'material-change', label: 'Change Material', description: 'Transform the surface material of your product to leather, metal, plastic, or fabric.', icon: 'Layers', color: 'text-orange-400', presets: ['Grained Leather', 'Matte Finish', 'Glossy Plastic', 'Polished Metal', 'Textured Fabric'] },
+      { id: 'virtual-try-on', label: 'Virtual Try-On', description: 'Upload a person and a product (clothes, jewelry, accessories) to see how it looks naturally worn.', icon: 'UserCircle', color: 'text-indigo-400', presets: ['Realistic Fit', 'Natural Pose', 'Studio Model', 'Outdoor Lifestyle', 'High-Fashion'] },
+    ]
+  },
+  {
+    category: 'Mockups & Devices',
+    items: [
+      { id: 'book-mockup', label: 'Book/Magazine', description: 'Map your design onto high-quality book covers or magazine spreads.', icon: 'BookOpen', color: 'text-amber-400', presets: ['Hardcover Book', 'Glossy Magazine', 'Softcover Novel', 'Minimalist Catalog'] },
+      { id: 'device-mockup', label: 'Device Mockup', description: 'Place your app or website onto realistic phone, tablet, or laptop screens.', icon: 'Smartphone', color: 'text-cyan-400', presets: ['iPhone 15 Pro', 'MacBook M3', 'iPad Pro', 'Android Phone', 'Desktop Monitor'] },
+      { id: 'apparel-mockup', label: 'Apparel Design', description: 'Showcase your graphics on various clothing items like hoodies or caps.', icon: 'Zap', color: 'text-indigo-400', presets: ['Hoodie', 'T-Shirt', 'Oversized Tee', 'Tote Bag', 'Cap Design'] },
+      { id: 'professional-shot', label: 'Object to Photo', description: 'Transform any object into a professional studio product shot.', icon: 'Wand2', color: 'text-teal-400', presets: ['Commercial Quality', 'E-commerce Standard', 'Magazine Spread', 'Instagram Viral'] },
+    ]
+  },
+  {
+    category: 'Marketing Assets',
+    items: [
+      { id: 'clean-shot', label: 'Floating Studio', description: 'Simple studio setup with soft shadows and plain backgrounds.', icon: 'Box', color: 'text-slate-400', presets: ['Pure White BG', 'Soft Shadow Gray', 'Gradient Minimal', 'Transparent PNG Style'] },
+      { id: 'packaging', label: 'Packaging & Box', description: 'Apply your branding to premium packing, boxes, and containers.', icon: 'Package', color: 'text-rose-400', presets: ['Premium Box', 'Eco-Friendly Pack', 'Matte Bottle', 'Minimal Can'] },
+      { id: 'billboard', label: 'Billboard/Ads', description: 'See your product on outdoor advertising displays and billboards.', icon: 'Monitor', color: 'text-blue-500', presets: ['City Billboard', 'Bus Stop Ad', 'Store Front', 'Mall Poster'] },
+      { id: 'social-post', label: 'Social Media Post', description: 'Create stunning social media imagery for Instagram, stories, or viral flatlays.', icon: 'UserCircle', color: 'text-pink-500', presets: ['Instagram Square', 'Story Layout', 'Viral Flatlay', 'Minimal Carousel'] },
+    ]
+  },
+  {
+    category: 'Advanced Views',
+    items: [
+      { id: 'seasonal', label: 'Seasonal/Festival', description: 'Theme your product shots for holidays, seasons, or special events.', icon: 'Sun', color: 'text-orange-500', presets: ['Christmas Vibes', 'Summer Beach', 'Autumn Leaves', 'Spring Fresh', 'Festival Lights'] },
+      { id: 'angle-view', label: '360° Style View', description: 'Change the perspective and camera angle of your product.', icon: 'RotateCw', color: 'text-emerald-500', presets: ['Top Down', '45 Degree Angle', 'Side Profile', 'Close-up Detail', 'Dynamic Tilt'] },
+    ]
+  }
+];
 export const WEIGHT_OPTIONS = [
   'Keep original', 'Slimmer', 'Athletic/Toned', 'Muscular', 'Average', 'More healthy', 'Custom'
 ];
@@ -590,3 +629,221 @@ export const POSE_OPTIONS = [
   'Custom'
 ];
 export const BATCH_COUNTS: (1 | 2)[] = [1, 2];
+
+export const CREATOR_TOOLS: CreatorTool[] = [
+  { id: 'logo', label: 'Best Logo Creator', description: 'Create stunning professional logos for any brand.', icon: 'Zap', color: 'text-indigo-400', placeholders: { mainText: 'e.g. MasterFaceAI', brandName: 'Brand Name', tagline: 'e.g. Identity Reimagined', description: 'e.g. minimalist, tech-focused, geometric', colors: 'e.g. Deep Blue and Slate' } },
+  { id: 'frame', label: 'Frame Creator', description: 'Design custom decorative frames for photos and art.', icon: 'Layers', color: 'text-rose-400', placeholders: { mainText: 'e.g. Floral Wedding Frame', description: 'e.g. ornate gold, tropical leaves, minimal wood', colors: 'e.g. Gold and White' } },
+  { id: 'pattern', label: 'Pattern Creator', description: 'Generate beautiful seamless textures and patterns.', icon: 'Palette', color: 'text-emerald-400', placeholders: { mainText: 'e.g. Geometric Tessellation', description: 'e.g. Moroccan tiles, abstract dots, floral silk', colors: 'e.g. Teal and Beige' } },
+  { id: 'social-post', label: 'Social Media Posts', description: 'Create viral post layouts for Instagram and FB.', icon: 'Smartphone', color: 'text-blue-400', placeholders: { mainText: 'e.g. Flash Sale Announcement', tagline: 'e.g. Up to 50% Off!', description: 'e.g. high-energy, clean typography, luxury vibe', colors: 'e.g. Neon Pink and Dark Blue' } },
+  { id: 'youtube-thumb', label: 'YouTube Thumbnails', description: 'Eye-catching thumbnails that drive clicks.', icon: 'Camera', color: 'text-red-500', placeholders: { mainText: 'e.g. 10 Secrets of AI', tagline: 'e.g. DON\'T MISS THIS', description: 'e.g. exaggerated expression, bold text, bright background', colors: 'e.g. YouTube Red and White' } },
+  { id: 'pinterest', label: 'Pinterest Pin Creator', description: 'Vertical high-engagement pins for lifestyle brands.', icon: 'Box', color: 'text-rose-600', placeholders: { mainText: 'e.g. 5 Home Decor Tips', brandName: 'e.g. Interior Daily', description: 'e.g. vertical layout, elegant font, aesthetic overlay', colors: 'e.g. Pastel Green and Cream' } },
+  { id: 'poster', label: 'Poster Creator', description: 'Design professional posters for events and ads.', icon: 'Layers', color: 'text-orange-400', placeholders: { mainText: 'e.g. AI Innovation Summit', brandName: 'e.g. Tech Global', description: 'e.g. Swiss typography, brutalist style, minimalist', colors: 'e.g. Black, White and Orange' } },
+  { id: 'sticker', label: 'Sticker Creator', description: 'Fun and unique sticker designs with die-cut look.', icon: 'Zap', color: 'text-yellow-400', placeholders: { mainText: 'e.g. Super Cool Robot', description: 'e.g. holographic finish, thick white border, cartoon style', colors: 'e.g. Neon Green and Purple' } },
+  { id: 'greetings', label: 'Greetings Card Creator', description: 'Personalized cards for every occasion.', icon: 'Zap', color: 'text-pink-400', placeholders: { mainText: 'e.g. Happy Birthday Sarah!', tagline: 'e.g. Wishing you the best year ever', description: 'e.g. watercolor florals, gold foil accents, elegant', colors: 'e.g. Soft Rose and Gold' } },
+  { id: 'visiting-card', label: 'Visiting Card Creator', description: 'Professional business cards that impress.', icon: 'BadgeCheck', color: 'text-slate-400', placeholders: { mainText: 'e.g. John Doe', brandName: 'e.g. Creative Solutions', tagline: 'e.g. Senior Product Designer', description: 'e.g. matte black finish, embossed logo, minimalist', colors: 'e.g. Charcoal and Silver' } },
+  { id: 'invite-card', label: 'Invite Card Creator', description: 'Elegant invitations for weddings and parties.', icon: 'Zap', color: 'text-indigo-300', placeholders: { mainText: 'e.g. Wedding Invitation', brandName: 'e.g. Alex & Jamie', description: 'e.g. black tie theme, art deco patterns, sophisticated', colors: 'e.g. Champagne and Navy' } },
+  { id: 'clip-art', label: 'Clip Art Creator', description: 'Isolated creative elements for your projects.', icon: 'Layers', color: 'text-cyan-400', placeholders: { mainText: 'e.g. Cute Space Cat', description: 'e.g. transparent-background style, clean outlines, flat vector', colors: 'e.g. Space Blue and Neon Pink' } },
+  { id: 'coloring-page', label: 'Coloring Page Creator', description: 'Black and white outlines for kids and adults.', icon: 'BookOpen', color: 'text-amber-600', placeholders: { mainText: 'e.g. Intricate Dragon', description: 'e.g. high detail, clean black lines, white background, Zen doodle', colors: 'e.g. Black and White Only' } },
+  { id: 'book-cover', label: 'Book Cover Creator', description: 'Stunning covers for novels and e-books.', icon: 'BookOpen', color: 'text-indigo-400', placeholders: { mainText: 'e.g. The AI Awakening', brandName: 'e.g. Author Name', description: 'e.g. sci-fi landscape, dramatic lighting, bold title', colors: 'e.g. Deep Space Purple' } },
+  { id: 'wall-art', label: 'Wall Art Sketch', description: 'Artistic sketches and line art for home decor.', icon: 'Sun', color: 'text-emerald-500', placeholders: { mainText: 'e.g. Abstract Mountain Range', description: 'e.g. minimalist line art, charcoal sketch, Scandinavian style', colors: 'e.g. Earth Tones and Black' } },
+  { id: 'adv-creative', label: 'Adv Creatives Creator', description: 'High-conversion ad imagery for marketing.', icon: 'Zap', color: 'text-blue-500', placeholders: { mainText: 'e.g. Modern Shoe Ad', tagline: 'e.g. Run Faster Than Light', description: 'e.g. clean product focus, dynamic lighting, e-commerce style', colors: 'e.g. Dynamic Red and White' } },
+  { id: 'illustrator', label: 'Illustrators Creator', description: 'Specialized illustrations in diverse artistic styles.', icon: 'Palette', color: 'text-purple-500', placeholders: { mainText: 'e.g. Cyberpunk Samurai', description: 'e.g. standing in rain, neon shadows, detailed armor', colors: 'e.g. Cyan and Magenta' } }
+];
+
+export const ILLUSTRATOR_STYLES = [
+  '2d Flat', '8-bit Pixel Style', 'AAA Game Style', 'Coloring Book', 'Anime Style', 
+  'Anime Style Illustration', 'Chibi Style', 'Children Drawing Style', 'Children\'s Book Style', 'Clay Style', 'Clip Art', 
+  'Clipart Style', 'Collage Art', 'Coloring Page', 'Comicbook Illustration', 'Crayon Painting Style', 'Crayon Style', 
+  'Creepy Vintage', 'Dark Manga Style', 'Detailed Cartoon Style', 'Doodle Style Illustration', 'Dreamy Invitation Style', 
+  'Flat & Stylized Digital Illustration', 'Flat Illustration Style', 'Futuristic Robots', 'Game Characters', 'Ghibli Style', 
+  'Golden Style', 'Grunge Scrapebook', 'Hand Knitted Style', 'Impasto Oil Painting', 'Intricate Pastoral Watercolor Style', 
+  'Kawaii Watercolor Style', 'Linocut Style', 'Loose Expressive Sketch Style', 'Lush Realistic Watercolor Style', 'Manga', 
+  'Minecraft Cinematic Style', 'Minecraft Style', 'Miniature', 'Minimalist Graphite Style', 'Minimalist Illustration', 
+  'Modern Paper Cutout Style', 'Multi-Expression Style', 'Mystic Fantasy', 'Naive Acrylic Style', 'Noise Vector Illustration', 
+  'Oil Painting', 'Oldschool Style', 'Origami Style', 'Painted Tissue Collage Style', 'Painting Illustration', 
+  'Pencil Sketch Style', 'Picturebook Style Version 2', 'Pixar Style', 'Pixelart Illustration', 'Plant & Flowers Pattern Style', 
+  'Playful Cartoon Storybook Style', 'Quirky Minimal Line Style', 'Retro Game Illustration', 'Retro Vibe', 
+  'Semi-Realistic Cartoon Style', 'Soft Digital Pastel Style', 'Soft Woolen Fiber Style', 'Stained Glass', 'Steampunk Journal', 
+  'Storybook Illustration', 'Unique Dreamy Style', 'Van Gogh', 'Vector Illustration', 'Wall Art Style', 'Watercolor Portrait', 
+  'Watercolor Style', 'Watercolor-Inspired Digital Style', 'Whimsical Fantasy Illustration', 'Whimsical Illustration', 
+  'Whimsical Storybook Style'
+];
+
+export const KIDS_ACTIVITIES: KidsActivity[] = [
+  {
+    id: 'maze',
+    label: 'Maze Generator',
+    description: 'Create fun custom mazes for kids of all levels.',
+    icon: 'Grid',
+    color: 'text-orange-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. My Amazing Maze' },
+      { id: 'difficulty', label: 'Level Selector', type: 'select', options: ['Easy', 'Medium', 'Hard', 'Expert'] },
+      { id: 'theme', label: 'Theme', type: 'text', placeholder: 'e.g. Under the Sea, Space Adventure' },
+      { id: 'mazeType', label: 'Maze Type', type: 'select', options: ['Classic', 'Spiral', 'Animal Path', 'Shape Path'] },
+      { id: 'illustrationStyle', label: 'Illustration Style', type: 'select', options: ['Cute Cartoon', 'Sketchy', 'Clean Vector', 'Storybook'] },
+      { id: 'primaryColor', label: 'Maze Color', type: 'text', placeholder: 'e.g. Dark Blue' },
+      { id: 'secondaryColor', label: 'Solution Color', type: 'text', placeholder: 'e.g. Bright Red' }
+    ]
+  },
+  {
+    id: 'spot-differences',
+    label: 'Spot the Difference',
+    description: 'Classic observation game with engaging illustrations.',
+    icon: 'Eye',
+    color: 'text-blue-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Jungle Twins' },
+      { id: 'theme', label: 'Theme', type: 'text', placeholder: 'e.g. Pirates on a ship' },
+      { id: 'numItems', label: 'Number of Differences', type: 'select', options: ['3', '5', '7'] },
+      { id: 'difficulty', label: 'Difficulty Level', type: 'select', options: ['Beginner', 'Intermediate', 'Advanced'] }
+    ]
+  },
+  {
+    id: 'shadow-matching',
+    label: 'Shadow Matching',
+    description: 'Help kids develop visual recognition by matching shapes.',
+    icon: 'Ghost',
+    color: 'text-purple-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Monster Match' },
+      { id: 'theme', label: 'Theme', type: 'text', placeholder: 'e.g. Household items, Animals' },
+      { id: 'primaryColor', label: 'Text Color', type: 'text', placeholder: 'e.g. Black' },
+      { id: 'secondaryColor', label: 'Shadow Color', type: 'text', placeholder: 'e.g. Dark Gray' },
+      { id: 'numItems', label: 'Number of Items', type: 'select', options: ['4', '6', '8'] }
+    ]
+  },
+  {
+    id: 'crossword',
+    label: 'Crossword Puzzles',
+    description: 'Expand vocabulary with themed grid puzzles.',
+    icon: 'Type',
+    color: 'text-emerald-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Summer Words' },
+      { id: 'illustrationStyle', label: 'Image Style', type: 'select', options: ['Plain', 'Detailed', 'Cute', 'Fun', 'Recognizable'] },
+      { id: 'theme', label: 'Theme', type: 'text', placeholder: 'e.g. Farm Animals' }
+    ]
+  },
+  {
+    id: 'word-matching',
+    label: 'Word To Image Matching',
+    description: 'Connect words with their corresponding pictures.',
+    icon: 'ArrowRight',
+    color: 'text-pink-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Fruits & Veggies' },
+      { id: 'theme', label: 'Theme/Idea', type: 'text', placeholder: 'e.g. Transport, Food' },
+      { id: 'language', label: 'Language', type: 'select', options: ['English', 'Bengali', 'Hindi', 'Spanish', 'French'] },
+      { id: 'numItems', label: 'Number of Pairs', type: 'select', options: ['4', '5', '6', '8'] }
+    ]
+  },
+  {
+    id: 'complete-word',
+    label: 'Complete the Word',
+    description: 'Fill in missing letters to complete the puzzles.',
+    icon: 'Box',
+    color: 'text-teal-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Spell the Space' },
+      { id: 'theme', label: 'Theme/Idea', type: 'text', placeholder: 'e.g. Planets, Stars' },
+      { id: 'difficulty', label: 'Difficulty Level', type: 'select', options: ['Easy', 'Medium', 'Hard'] }
+    ]
+  },
+  {
+    id: 'correct-spelling',
+    label: 'Spot the Correct Spelling',
+    description: 'Identify the right spelling among variants.',
+    icon: 'CheckCircle2',
+    color: 'text-rose-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Spelling Bee' },
+      { id: 'theme', label: 'Theme/Idea', type: 'text', placeholder: 'e.g. Colors, Everyday objects' },
+      { id: 'numItems', label: 'Number of Questions', type: 'select', options: ['5', '8', '10'] }
+    ]
+  },
+  {
+    id: 'coloring-page',
+    label: 'Coloring Page Generator',
+    description: 'Unique black and white illustrations for coloring fun.',
+    icon: 'Palette',
+    color: 'text-amber-500',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Dragon Kingdom' },
+      { id: 'theme', label: 'Theme', type: 'text', placeholder: 'e.g. Enchanted Forest' },
+      { id: 'illustrationStyle', label: 'Artistic Style', type: 'select', options: ['Simple Outlines', 'Detailed Zen', 'Kawaii', 'Classic Storybook'] }
+    ]
+  },
+  {
+    id: 'connect-dots',
+    label: 'Connect the Dots',
+    description: 'Numbered dots that reveal a surprise image.',
+    icon: 'Sparkles',
+    color: 'text-indigo-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Dot-to-Dot Dino' },
+      { id: 'theme', label: 'Theme', type: 'text', placeholder: 'e.g. Vehicles, Dinosaurs' },
+      { id: 'difficulty', label: 'Number Range', type: 'select', options: ['1-10', '1-20', '1-50', '1-100'] }
+    ]
+  },
+  {
+    id: 'hidden-object',
+    label: 'Find the Hidden Object',
+    description: 'Search and find mission in a dense illustration.',
+    icon: 'Search',
+    color: 'text-cyan-400',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Lost in the Attic' },
+      { id: 'theme', label: 'Theme', type: 'text', placeholder: 'e.g. Toy Shop, Ocean floor' },
+      { id: 'numItems', label: 'Objects to Find', type: 'select', options: ['5', '10', '15'] }
+    ]
+  },
+  {
+    id: 'tracing-sheet',
+    label: 'Tracing Sheets',
+    description: 'Alphabet and number practice for early learners.',
+    icon: 'PenTool',
+    color: 'text-yellow-600',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. ABC Practice' },
+      { id: 'theme', label: 'Focus', type: 'select', options: ['Uppercase Letters', 'Lowercase Letters', 'Numbers 1-10', 'Shapes'] },
+      { id: 'illustrationStyle', label: 'Style', type: 'select', options: ['Dotted', 'Solid with Arrows', 'Hollow Letters'] }
+    ]
+  },
+  {
+    id: 'math-puzzle',
+    label: 'Simple Math Puzzles',
+    description: 'Fun visual arithmetic challenges for kids.',
+    icon: 'Plus',
+    color: 'text-blue-500',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Fruit Addition' },
+      { id: 'theme', label: 'Skill Focus', type: 'select', options: ['Addition', 'Subtraction', 'Counting', 'Patterns'] },
+      { id: 'difficulty', label: 'Level', type: 'select', options: ['Preschool', 'Kindergarten', 'Grade 1'] }
+    ]
+  },
+  {
+    id: 'storybook',
+    label: 'Storybook Page Creator',
+    description: 'Generate a magical scene from a story.',
+    icon: 'BookOpen',
+    color: 'text-red-400',
+    fields: [
+      { id: 'pageTitle', label: 'Scene Title', type: 'text', placeholder: 'e.g. The Brave Little Fox' },
+      { id: 'theme', label: 'Story Idea', type: 'textarea', placeholder: 'Describe what\'s happening in the scene...' },
+      { id: 'illustrationStyle', label: 'Art Style', type: 'select', options: ['Watercolor', 'Ghibli Style', 'Flat Illustration', 'Sketchy'] }
+    ]
+  },
+  {
+    id: 'memory-match',
+    label: 'Memory Match Cards',
+    description: 'Printable card sets for memory games.',
+    icon: 'Layers',
+    color: 'text-violet-500',
+    fields: [
+      { id: 'pageTitle', label: 'Page Title', type: 'text', placeholder: 'e.g. Space Memory Game' },
+      { id: 'theme', label: 'Card Theme', type: 'text', placeholder: 'e.g. Space, Animals, Fruits' },
+      { id: 'numItems', label: 'Cards per Sheet', type: 'select', options: ['6', '8', '12'] }
+    ]
+  }
+];

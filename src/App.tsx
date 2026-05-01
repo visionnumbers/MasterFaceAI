@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Sparkles, Wand2, Info, ChevronRight, History, Heart, X, Zap, UserCheck, Globe, Palette, Move, Smile, Scissors, Glasses, Frame, Brush, UserCircle, Image as ImageIcon, Camera, RotateCw, Sparkle, Wind, Eye, Users, Baby, Tent, Trash2, Ghost } from 'lucide-react';
+import { Download, Sparkles, Wand2, Info, ChevronRight, History, Heart, X, Zap, UserCheck, Globe, Palette, Move, Smile, Scissors, Glasses, Frame, Brush, UserCircle, Image as ImageIcon, Camera, RotateCw, Sparkle, Wind, Eye, Users, Baby, Tent, Trash2, Ghost, Package, Box } from 'lucide-react';
 import { Header } from './components/Header';
 import { Dropzone } from './components/Dropzone';
 import { GenerationPanel } from './components/GenerationPanel';
@@ -8,9 +8,13 @@ import { AdvancedPanel } from './components/AdvancedPanel';
 import { ResultsGallery } from './components/ResultsGallery';
 import { Lightbox } from './components/Lightbox';
 import { ImagePromptExtractor } from './components/ImagePromptExtractor';
+import { ProductShotMode } from './components/ProductShotMode';
+import { CreatorMode } from './components/CreatorMode';
+import { KidsZoneMode } from './components/KidsZoneMode';
+import { TextToImageMode } from './components/TextToImageMode';
 import { GenerationSettings, GeneratedImage } from './types';
 import { fileToBase64, cn } from './lib/utils';
-import { analyzeFace, analyzeStyleReference, generateProfilePicture } from './services/geminiService';
+import { analyzeFace, analyzeStyleReference, analyzeProductOnly, generateProfilePicture, generateProductShot, generateCreatorImage, generateKidsZoneImage, enhancePromptWithReferences } from './services/geminiService';
 import JSZip from 'jszip';
 import { SHOT_RANGES, SMART_EDIT_OPTIONS } from './constants';
 
@@ -28,12 +32,17 @@ export default function App() {
   const [isStylesOpen, setIsStylesOpen] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [stylePreviewUrl, setStylePreviewUrl] = useState<string | null>(null);
+  const [tryOnPersonFile, setTryOnPersonFile] = useState<File | null>(null);
+  const [tryOnPersonPreviewUrl, setTryOnPersonPreviewUrl] = useState<string | null>(null);
+  const [creatorFile, setCreatorFile] = useState<File | null>(null);
+  const [kidsZoneFile, setKidsZoneFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationPhase, setGenerationPhase] = useState<string>('');
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [faceDescription, setFaceDescription] = useState<string | null>(null);
   const [styleDescription, setStyleDescription] = useState<string | null>(null);
+  const [productDescription, setProductDescription] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cooldownTime, setCooldownTime] = useState<number>(0);
 
@@ -52,7 +61,29 @@ export default function App() {
     mood: 'Confident',
     ratio: '1:1',
     quality: 'high',
-    negativePrompt: ''
+    negativePrompt: '',
+    productShot: {
+      activeFeature: '',
+      value: '',
+      customPrompt: ''
+    },
+    creator: {
+      activeToolId: '',
+      inputs: {},
+      customPrompt: ''
+    },
+    kidsZone: {
+      activeActivityId: '',
+      inputs: {},
+      customPrompt: ''
+    },
+    textToImage: {
+      prompt: '',
+      faceReference: null,
+      styleReference: null,
+      faceBase64: undefined,
+      styleBase64: undefined
+    }
   });
 
   // Effects
@@ -110,6 +141,7 @@ export default function App() {
     setSelectedFile(file);
     setFaceDescription(null);
     setStyleDescription(null); // Reset style description too for smart edit
+    setProductDescription(null);
     if (file) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
@@ -157,36 +189,90 @@ export default function App() {
     // For simplicity, let's call handleGenerate and rely on state being mostly correct or pass params
   };
 
+  const handleTryOnPersonSelect = (file: File) => {
+    setTryOnPersonFile(file);
+    const url = URL.createObjectURL(file);
+    setTryOnPersonPreviewUrl(url);
+    // Pre-clear old analysis
+    setFaceDescription(null);
+    setProductDescription(null);
+  };
+
   // Improved handleGenerate to accept optional overrides
   const handleGenerate = async (overrides?: Partial<GenerationSettings>, overrideFile?: File, overridePrompt?: string) => {
-    const activeFile = overrideFile || selectedFile;
-    if (!activeFile || cooldownTime > 0) return;
-    
     const activeSettings = overrides ? { ...settings, ...overrides } : settings;
+    const activeFile = overrideFile || selectedFile;
+    
+    // Creator mode and Text to Image mode don't require a main file
+    if (activeSettings.mode !== 'creator' && activeSettings.mode !== 'kids-zone' && activeSettings.mode !== 'text-to-image' && !activeFile) return;
+    if (cooldownTime > 0) return;
 
     if (activeSettings.mode === 'reference' && !styleFile) {
       setError('Please upload a style reference photo.');
+      return;
+    }
+    if (activeSettings.mode === 'text-to-image' && !activeSettings.textToImage?.prompt) {
+      setError('Please enter a description for your image.');
       return;
     }
     if (activeSettings.mode === 'smart-edit' && (!activeSettings.smartEdit?.activeAttribute || !activeSettings.smartEdit?.value)) {
       setError('Please select an attribute to edit and provide a description.');
       return;
     }
+    if (activeSettings.mode === 'product-shot' && !activeSettings.productShot?.activeFeature) {
+      setError('Please select a product feature to apply.');
+      return;
+    }
     
     try {
       setIsGenerating(true);
-      const base64 = await fileToBase64(activeFile);
+      const base64 = activeFile ? await fileToBase64(activeFile) : '';
       const styleBase64 = styleFile ? await fileToBase64(styleFile) : undefined;
       
       let currentFaceDesc = faceDescription;
-      if (!currentFaceDesc) {
-        setError(null);
-        setGenerationPhase('Locking Identity: Analyzing facial geometry...');
-        currentFaceDesc = await analyzeFace(base64);
-        setFaceDescription(currentFaceDesc);
+      let currentStyleDesc = styleDescription;
+      // Skip face analysis for non-portrait centric modes unless feature needs it
+      const isTryOn = activeSettings.mode === 'product-shot' && activeSettings.productShot?.activeFeature === 'virtual-try-on';
+      const needsFaceLock = (activeSettings.mode !== 'product-shot' && activeSettings.mode !== 'creator' && activeSettings.mode !== 'kids-zone' && activeSettings.mode !== 'text-to-image') || 
+                           (activeSettings.mode === 'product-shot' && ['jewelry', 'logo-apparel', 'virtual-try-on'].includes(activeSettings.productShot?.activeFeature || '')) ||
+                           (activeSettings.mode === 'text-to-image' && !!activeSettings.textToImage?.faceReference);
+
+      // Reset descriptions for Text to Image if reference is removed to avoid ghost analysis
+      if (activeSettings.mode === 'text-to-image') {
+        if (!activeSettings.textToImage?.faceReference) {
+          currentFaceDesc = null;
+          setFaceDescription(null);
+        }
+        if (!activeSettings.textToImage?.styleReference) {
+          currentStyleDesc = null;
+          setStyleDescription(null);
+        }
       }
 
-      let currentStyleDesc = styleDescription;
+      if (!currentFaceDesc && needsFaceLock) {
+        setError(null);
+        setGenerationPhase('Locking Identity: Analyzing facial geometry...');
+        
+        let faceAnalysisSource = base64;
+        if (isTryOn && tryOnPersonFile) {
+          faceAnalysisSource = await fileToBase64(tryOnPersonFile);
+        } else if (activeSettings.mode === 'text-to-image' && activeSettings.textToImage?.faceReference) {
+          faceAnalysisSource = await fileToBase64(activeSettings.textToImage.faceReference);
+        }
+
+        if (faceAnalysisSource) {
+          currentFaceDesc = await analyzeFace(faceAnalysisSource);
+          setFaceDescription(currentFaceDesc);
+        }
+      }
+
+      let currentProductDesc = productDescription;
+      if (isTryOn && !currentProductDesc) {
+        setGenerationPhase('Analyzing Product: Mapping clothing details...');
+        currentProductDesc = await analyzeProductOnly(base64);
+        setProductDescription(currentProductDesc);
+      }
+
       // In smart-edit mode, Image 1 is the scene blueprint
       if (activeSettings.mode === 'smart-edit' && !currentStyleDesc) {
         setGenerationPhase("Smart Edit: Indexing original scene...");
@@ -197,26 +283,63 @@ export default function App() {
         const styleBase64ForAnalysis = await fileToBase64(styleFile);
         currentStyleDesc = await analyzeStyleReference(styleBase64ForAnalysis);
         setStyleDescription(currentStyleDesc);
+      } else if (activeSettings.mode === 'text-to-image' && activeSettings.textToImage?.styleReference && !currentStyleDesc) {
+        setGenerationPhase("Style Transfer: Analyzing artistic reference...");
+        const styleBase64ForAnalysis = await fileToBase64(activeSettings.textToImage.styleReference);
+        currentStyleDesc = await analyzeStyleReference(styleBase64ForAnalysis);
+        setStyleDescription(currentStyleDesc);
       }
 
       setGenerationPhase(`Synthesizing ${activeSettings.count} Neural Layers...`);
       
-      // Generate images in sequence with a small delay to avoid rate limits
+      const isCreator = activeSettings.mode === 'creator';
+      
+      // Generate images in sequence
       for (let i = 0; i < activeSettings.count; i++) {
-        // Add a small stagger delay between images in a batch to avoid immediate rate limits
+        // Stagger delay between images in a batch
         if (i > 0) {
-          setGenerationPhase(`Engine Cooling: Ready in 5s...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          const delay = isCreator ? 800 : 5000;
+          if (delay > 1000) {
+            setGenerationPhase(`Engine Cooling: Ready in ${Math.round(delay/1000)}s...`);
+          } else {
+            setGenerationPhase(`Batch Sequencing...`);
+          }
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
 
         setGenerationPhase(`Rendering Instance ${i + 1} of ${activeSettings.count}...`);
-        const result = await generateProfilePicture(
-          base64, 
-          currentFaceDesc || '', 
-          activeSettings, 
-          styleBase64,
-          currentStyleDesc || undefined
-        );
+        
+        let result;
+        if (activeSettings.mode === 'product-shot') {
+          let personBase64: string | undefined = undefined;
+          if (activeSettings.productShot?.activeFeature === 'virtual-try-on') {
+            if (!tryOnPersonFile) {
+              throw new Error("Please upload a person photo for Try-On.");
+            }
+            personBase64 = await fileToBase64(tryOnPersonFile);
+          }
+          result = await generateProductShot(
+            base64, 
+            activeSettings, 
+            personBase64, 
+            currentFaceDesc || undefined, 
+            currentProductDesc || undefined
+          );
+        } else if (activeSettings.mode === 'creator') {
+          const creatorBase64 = creatorFile ? await fileToBase64(creatorFile) : undefined;
+          result = await generateCreatorImage(activeSettings, creatorBase64);
+        } else if (activeSettings.mode === 'kids-zone') {
+          const kidsBase64 = kidsZoneFile ? await fileToBase64(kidsZoneFile) : undefined;
+          result = await generateKidsZoneImage(activeSettings, kidsBase64);
+        } else {
+          result = await generateProfilePicture(
+            base64, 
+            currentFaceDesc || '', 
+            activeSettings, 
+            styleBase64,
+            currentStyleDesc || undefined
+          );
+        }
 
         if (!result || !result.url) {
           throw new Error("Invalid image data received from generator.");
@@ -233,9 +356,10 @@ export default function App() {
 
         setGeneratedImages(prev => [newImage, ...prev]);
 
-        // Add a 3s delay between requests to avoid hitting rate limits for the 1000/day quota
+        // Add a delay between requests to avoid hitting rate limits
         if (i < activeSettings.count - 1) {
-          await new Promise(resolve => setTimeout(resolve, 3500));
+          const postDelay = isCreator ? 0 : 3500;
+          if (postDelay > 0) await new Promise(resolve => setTimeout(resolve, postDelay));
         }
       }
       
@@ -566,6 +690,57 @@ export default function App() {
                   }}
                 />
               </div>
+            ) : settings.mode === 'product-shot' ? (
+              <div className="col-span-12 h-full">
+                <ProductShotMode 
+                  settings={settings}
+                  setSettings={setSettings}
+                  selectedFile={selectedFile}
+                  onFileSelect={handleFileSelect}
+                  previewUrl={previewUrl}
+                  tryOnPersonFile={tryOnPersonFile}
+                  onTryOnPersonSelect={handleTryOnPersonSelect}
+                  tryOnPersonPreviewUrl={tryOnPersonPreviewUrl}
+                  isDark={isDark}
+                />
+              </div>
+            ) : settings.mode === 'creator' ? (
+              <div className="col-span-12 h-full">
+                <CreatorMode 
+                  settings={settings.creator!}
+                  onSettingsChange={(creatorSettings) => setSettings({ ...settings, creator: creatorSettings })}
+                  selectedFile={creatorFile}
+                  onFileSelect={setCreatorFile}
+                  onGenerate={() => handleGenerate({ creator: settings.creator, count: settings.count })}
+                  count={settings.count}
+                  isGenerating={isGenerating}
+                  cooldownTime={cooldownTime}
+                />
+              </div>
+            ) : settings.mode === 'kids-zone' ? (
+              <div className="col-span-12 h-full">
+                <KidsZoneMode 
+                  settings={settings.kidsZone!}
+                  onSettingsChange={(kidsSettings) => setSettings({ ...settings, kidsZone: kidsSettings })}
+                  selectedFile={kidsZoneFile}
+                  onFileSelect={setKidsZoneFile}
+                  onGenerate={() => handleGenerate({ kidsZone: settings.kidsZone, count: settings.count })}
+                  count={settings.count}
+                  isGenerating={isGenerating}
+                  cooldownTime={cooldownTime}
+                />
+              </div>
+            ) : settings.mode === 'text-to-image' ? (
+              <div className="col-span-12 h-full">
+                <TextToImageMode 
+                  settings={settings.textToImage!}
+                  onSettingsChange={(t2iSettings) => setSettings({ ...settings, textToImage: t2iSettings })}
+                  onGenerate={() => handleGenerate({ textToImage: settings.textToImage, count: settings.count })}
+                  count={settings.count}
+                  isGenerating={isGenerating}
+                  cooldownTime={cooldownTime}
+                />
+              </div>
             ) : (
               <>
                 <div className="col-span-12 lg:col-span-4 h-full">
@@ -637,8 +812,35 @@ export default function App() {
             </div>
           )}
 
+          {settings.mode === 'product-shot' && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-500/5 border border-blue-500/10 -mt-2">
+              <Package className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <p className="text-[10px] text-blue-600/80 font-bold uppercase tracking-wider">
+                Product Shot Mode Active: Transform objects and products into professional commercial photography.
+              </p>
+            </div>
+          )}
+
+          {settings.mode === 'creator' && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 -mt-2">
+              <Box className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <p className="text-[10px] text-indigo-600/80 font-bold uppercase tracking-wider">
+                Creator Mode Active: Use specialized tools to design professional assets with AI.
+              </p>
+            </div>
+          )}
+
+          {settings.mode === 'kids-zone' && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-500/5 border border-purple-500/10 -mt-2">
+              <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+              <p className="text-[10px] text-purple-600/80 font-bold uppercase tracking-wider">
+                Kids Zone Mode Active: Creating magical educational activities for children.
+              </p>
+            </div>
+          )}
+
           {/* Generate Action Area (New) */}
-          <div className={cn("flex justify-center -mb-2 relative z-20", settings.mode === 'extractor' && "hidden")}>
+          <div className={cn("flex justify-center -mb-2 relative z-20", (settings.mode === 'extractor' || settings.mode === 'creator' || settings.mode === 'kids-zone' || settings.mode === 'text-to-image') && "hidden")}>
             <button
               id="main-generate-button"
               disabled={!selectedFile || isGenerating}

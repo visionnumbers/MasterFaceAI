@@ -1,6 +1,6 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { GenerationSettings } from "../types";
-import { CATEGORIES, SHOT_RANGES } from "../constants";
+import { GenerationSettings, GenerationResult } from "../types";
+import { CATEGORIES, SHOT_RANGES, PRODUCT_SHOT_FEATURES, CREATOR_TOOLS, KIDS_ACTIVITIES } from "../constants";
 
 function getStyleBehavior(styleId: string): 'realistic' | 'soft-stylized' | 'hard-stylized' {
   const hardStylized = [
@@ -168,6 +168,34 @@ export async function analyzeStyleReference(base64Image: string): Promise<string
   });
 }
 
+export async function analyzeProductOnly(base64Image: string): Promise<string> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const prompt = `Analyze ONLY the product, clothing, jewelry, or accessory in this image.
+COMPLETELY IGNORE any human face, facial features, or identity if a model is present.
+Focus exclusively on:
+1. PRODUCT TYPE: (e.g., dress, watch, necklace, hoodie, etc.)
+2. MATERIAL & TEXTURE: (e.g., silk, leather, knit, gold, polished, matte)
+3. COLOR & PATTERN: (e.g., midnight blue, floral, solid, metallic)
+4. DESIGN ELEMENTS: (e.g., collar type, sleeve length, gemstone cut, strap style, branding)
+5. DRAPE & LIGHTING: How the light hits the material and how it naturally falls/folds.
+
+Provide a technical blueprint of the PRODUCT ONLY for precise replication.`;
+
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash-lite",
+      contents: {
+        parts: [
+          { inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: "image/jpeg" } },
+          { text: prompt }
+        ]
+      }
+    });
+
+    return result.text || "High-quality product description.";
+  });
+}
+
 export async function extractImagePrompt(base64Image: string): Promise<string> {
   return withRetry(async () => {
     const ai = getAI();
@@ -200,11 +228,6 @@ export async function extractImagePrompt(base64Image: string): Promise<string> {
   });
 }
 
-export interface GenerationResult {
-  url: string;
-  prompt: string;
-}
-
 export async function generateProfilePicture(
   base64Image: string,
   faceDescription: string,
@@ -223,7 +246,84 @@ export async function generateProfilePicture(
       
       let prompt = "";
 
-      if (settings.mode === 'smart-edit' && settings.smartEdit && styleDescription) {
+      if (settings.mode === 'text-to-image' && settings.textToImage?.prompt) {
+        const hasFaceRef = !!settings.textToImage?.faceBase64;
+        const hasStyleRef = !!settings.textToImage?.styleBase64;
+
+        prompt = `
+      TASK: Generate a NEW image according to the user prompt below.
+
+      USER PROMPT:
+      "${settings.textToImage.prompt}"
+
+      ${hasFaceRef ? `
+      === FACE REFERENCE / IDENTITY LOCK (HIGHEST PRIORITY) ===
+      - The uploaded Face Reference is the ONLY identity source.
+      - Face description: ${faceDescription}
+      - The final person MUST be instantly recognizable as the Face Reference person.
+      - Preserve identity markers: face shape, eye shape, eye color, nose, lips, jawline, chin, skin tone, mustache/beard, age range, expression, and unique marks.
+      - Do NOT copy, blend, or borrow any face from the Style Reference.
+      - Do NOT morph identity.
+      ` : `
+      === FACE REFERENCE ===
+      - No Face Reference uploaded.
+      - Do not perform face lock.
+      - Generate the subject according to the user prompt and available style reference.
+      `}
+
+      ${hasStyleRef ? `
+      === STYLE REFERENCE ===
+      ${hasFaceRef ? `
+      - Use the Style Reference ONLY as a non-identity style blueprint.
+      - Apply only lighting, composition, background, pose, clothing style, camera angle, props, atmosphere, and overall aesthetic.
+      - Ignore any person’s face, eyes, expression, ethnicity, age, or identity from the Style Reference.
+      - The Style Reference is NOT an identity source.
+
+      STYLE BLUEPRINT:
+      ${styleDescription || 'Use the uploaded style reference as visual style guidance only.'}
+      ` : `
+      - Use the uploaded Style Reference as the main visual style and composition reference.
+      - Since no Face Reference is uploaded, it is allowed to follow the general subject style, pose, lighting, background, and composition from the Style Reference.
+      - Still follow the USER PROMPT as the main instruction.
+      `}
+      ` : `
+      === STYLE REFERENCE ===
+      - No Style Reference uploaded.
+      `}
+
+      STRICT PRIORITY ORDER:
+      ${hasFaceRef ? `
+      1. User prompt intent
+      2. Face Reference identity
+      3. Style Reference for non-face style only
+      ` : hasStyleRef ? `
+      1. User prompt intent
+      2. Style Reference visual guidance
+      3. General image quality
+      ` : `
+      1. User prompt intent
+      2. General image quality
+      `}
+
+      OUTPUT REQUIREMENTS:
+      - High-resolution professional image.
+      - Natural integration.
+      ${hasFaceRef ? '- Face must match Face Reference.' : ''}
+      ${hasStyleRef ? '- Style, lighting, pose, background, and composition may follow the Style Reference.' : ''}
+      ${hasFaceRef && hasStyleRef ? '- Do NOT recreate the person from the Style Reference.' : ''}
+
+      NEGATIVE PROMPT:
+      ${settings.negativePrompt || ''}
+      ${hasFaceRef && hasStyleRef ? `
+      - Do not copy the face from the Style Reference.
+      - Do not keep any style-reference person identity.
+      - Do not blend faces.
+      - Do not morph identity.
+      - Do not generate the style-reference person.
+      ` : ''}
+      - Avoid distorted face, broken hands, artifacts, or low-quality output.
+      `;
+      } else if (settings.mode === 'smart-edit' && settings.smartEdit && styleDescription) {
         const { activeAttribute, value } = settings.smartEdit;
         prompt = `
           [SMART EDIT COMMAND]: Modify Image 1 based on the instruction while locking identity.
@@ -299,13 +399,13 @@ export async function generateProfilePicture(
           - Identity cannot change.
 
           OUTPUT:
-          High-quality professional portrait, accurate pose, accurate scene style, sharp recognizable face.
+          High-quality professional portrait, accurate post, accurate scene style, sharp recognizable face.
 
           NEGATIVE PROMPT:
           ${settings.negativePrompt}. No style-reference face. No different identity. No missing visible objects from blueprint. No missing visible atmospheric effects from blueprint. No face blending. No identity morphing.
           `;
       } else {
-       // Normal built-in styles mode
+        // Normal built-in styles mode
         const allStyles = CATEGORIES.flatMap(c => c.styles);
         const style = allStyles.find(s => s.id === settings.styleId) || allStyles[0];
         const styleBehavior = getStyleBehavior(style.id);
@@ -401,7 +501,7 @@ export async function generateProfilePicture(
           - Pose: ${settings.pose || 'Match natural pose from reference'}
           - Pose Instruction: The subject must clearly follow this pose naturally and realistically.
           - Maintain body proportions according to Style Behavior.
-          - Do NOT randomly change pose unless explicitly specified.
+          - Do NOT randomly change body proportions unless explicitly specified.
 
           SUBJECT ADJUSTMENTS:
           - Age: ${settings.age || 'Keep original age'}
@@ -464,14 +564,46 @@ export async function generateProfilePicture(
           `;
       }
 
-      const parts: any[] = [
-        { inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: "image/jpeg" } }
-      ];
+      const parts: any[] = [];
 
-      // IMPORTANT:
-      // Do NOT pass styleBase64 into image generation.
-      // Passing the style reference image makes Gemini copy its original face/identity.
-      // We only use styleDescription text as scene/style blueprint.
+      if (settings.mode === 'text-to-image') {
+        const faceRef = settings.textToImage?.faceBase64;
+        const styleRef = settings.textToImage?.styleBase64;
+
+        if (faceRef && faceRef.length > 0) {
+          // CASE: Face exists
+          // Send ONLY face image for identity lock.
+          // If style also exists, style must be used only through styleDescription text.
+          parts.push({
+            inlineData: {
+              data: faceRef.split(',')[1] || faceRef,
+              mimeType: "image/jpeg"
+            }
+          });
+        } else if (styleRef && styleRef.length > 0) {
+          // CASE: No face image, only style reference exists
+          // Here it is okay to send style image directly because there is no face lock requirement.
+          parts.push({
+            inlineData: {
+              data: styleRef.split(',')[1] || styleRef,
+              mimeType: "image/jpeg"
+            }
+          });
+        }
+
+        // CASE: Only text prompt
+        // No image part is added.
+      } else {
+        // Other modes
+        if (base64Image && base64Image.length > 0) {
+          parts.push({
+            inlineData: {
+              data: base64Image.split(',')[1] || base64Image,
+              mimeType: "image/jpeg"
+            }
+          });
+        }
+      }
 
       parts.push({ text: prompt });
 
@@ -504,4 +636,421 @@ export async function generateProfilePicture(
   } finally {
     isGenerationInProgress = false;
   }
+}
+
+export async function generateProductShot(
+  base64Image: string,
+  settings: GenerationSettings,
+  personBase64?: string,
+  faceDescription?: string,
+  productDescription?: string
+): Promise<GenerationResult> {
+  if (isGenerationInProgress) {
+    throw new Error("Generation already in progress. Please wait.");
+  }
+
+  isGenerationInProgress = true;
+  try {
+    return await withRetry(async () => {
+      const ai = getAI();
+      const productSettings = settings.productShot;
+
+      if (!productSettings || !productSettings.activeFeature) {
+        throw new Error('Product Shot feature not selected');
+      }
+
+      const feature = PRODUCT_SHOT_FEATURES.flatMap(c => c.items).find(i => i.id === productSettings.activeFeature);
+
+      const prompt = `
+        TASK: Perform a PROFESSIONAL PRODUCT PHOTOGRAPHY modification on the provided image(s).
+        
+        CORE OBJECTIVE:
+        - Feature: ${feature?.label}
+        - Setting/Value: ${productSettings.value}
+        - Additional Instructions: ${productSettings.customPrompt || 'None'}
+
+        ${productSettings.activeFeature === 'virtual-try-on' ? `
+        VIRTUAL TRY-ON RULES (CRITICAL - EXTREMELY STRICT):
+        1. IMAGE 1 = PERSON PHOTO. Use this analysis for IDENTITY LOCK: ${faceDescription || 'Original Identity'}.
+        2. IMAGE 2 = PRODUCT PHOTO. Use this analysis for PRODUCT BLUEPRINT: ${productDescription || 'Original Product'}.
+        
+        FACE LOCK PROTOCOL:
+        - Use 100% face from Image 1 ONLY.
+        - NEVER copy, blend, or reference any face, facial features, or expression from Image 2, even if a model is wearing the product.
+        - REPLACE any face in Image 2 with the exact face from Image 1.
+        - The person must be 100% recognizable as the person from Image 1.
+        
+        PRODUCT INTEGRATION:
+        - Apply the product from Image 2 onto the person from Image 1.
+        - Ensure PERFECT fitting, realistic draping, and natural skin contact points.
+        - Match lighting and perspective of Image 1 for a seamless look.
+        
+        ENVIRONMENT & POSE:
+        - Generate a clean, professional studio background and natural pose.
+        - DO NOT copy the background or pose from the product image.
+
+        NEGATIVE PROMPT: Never copy the face from the product image. Never keep any model's face. Never blend faces. Do not use any facial features from Image 2. The face MUST come exclusively from Image 1.
+        ` : ''}
+
+        EXECUTION RULES:
+        - PRESERVE IDENTITY: The main product, object, or person from the source must maintain its core characteristics unless the feature explicitly asks to change them.
+        - COMMERCIAL QUALITY: Output must look like a high-end commercial photo, with clean lighting, sharp focus, and premium rendering.
+        
+        FEATURE SPECIFIC GUIDELINES:
+        ${productSettings.activeFeature === 'lifestyle' ? '- Place the product naturally in the specified environment. If the setting implies human interaction (e.g., "Hands holding", "Worn"), render realistic human hands or a person correctly scaled and interacting with the product. Ensure realistic shadows, reflections, and contact points.' : ''}
+        ${productSettings.activeFeature === 'jewelry' ? `- Use identity lock for jewelry: ${faceDescription || 'Original Identity'}. Show the jewelry from the product image worn by this person. Ensure realistic gemstone brilliance and metal reflections.` : ''}
+        ${productSettings.activeFeature === 'logo-apparel' ? '- Apply the logo precisely to the apparel. Follow the fabric contours, lighting, and texture realistically.' : ''}
+        ${productSettings.activeFeature === 'color-change' ? '- Change the product color to the specified value. Preserve all surface textures, shadows, and highlights.' : ''}
+        ${productSettings.activeFeature === 'material-change' ? '- Transform the material surface to the target type (e.g., leather, metal). Ensure realistic material-specific reflections and grain.' : ''}
+        ${productSettings.activeFeature === 'book-mockup' || productSettings.activeFeature === 'device-mockup' || productSettings.activeFeature === 'apparel-mockup' ? '- Use the provided image content as the design/cover/screen and map it perfectly onto the mockup object.' : ''}
+        ${productSettings.activeFeature === 'clean-shot' ? '- Isolate the product on a clean, professional studio background. Add soft, realistic contact shadows.' : ''}
+
+        QUALITY:
+        - Cinematic studio lighting
+        - Extremely high-detail textures
+        - Zero Distortion
+        - 8k resolution e-commerce style
+      `;
+
+      const parts: any[] = [];
+      
+      // Image 1: Person (if in Try-On mode) - User wants this as Image 1 for identity lock
+      if (personBase64 && personBase64.length > 0) {
+        parts.push({ inlineData: { data: personBase64.split(',')[1] || personBase64, mimeType: "image/jpeg" } });
+      }
+      
+      // Image 2: Main Product (or Design)
+      if (base64Image && base64Image.length > 0) {
+        parts.push({ inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: "image/jpeg" } });
+      }
+
+      parts.push({ text: prompt.trim() });
+
+      const response: GenerateContentResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents: { parts },
+        config: {
+          imageConfig: { aspectRatio: settings.ratio as any },
+          temperature: 0.1,
+          topP: 0.8
+        }
+      });
+
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            return {
+              url: `data:image/png;base64,${part.inlineData.data}`,
+              prompt: prompt.trim()
+            };
+          }
+        }
+      }
+
+      throw new Error("Model success but no image was returned. Check safety filters.");
+    });
+  } catch (error: any) {
+    console.error("Product Shot Gemini Error:", error);
+    
+    // Friendly error for safety filters
+    const errorMessage = error?.message?.toLowerCase() || '';
+    if (errorMessage.includes('safety') || errorMessage.includes('blocked') || errorMessage.includes('content policy') || errorMessage.includes('finish_reason_safety')) {
+      throw new Error("Sorry, this product could not be generated due to AI content safety restrictions. Please try a different outfit or a less revealing product.");
+    }
+    
+    throw error;
+  } finally {
+    isGenerationInProgress = false;
+  }
+}
+
+export async function generateCreatorImage(
+  settings: GenerationSettings,
+  base64Image?: string
+): Promise<GenerationResult> {
+  const creatorSettings = settings.creator;
+  const activeToolId = creatorSettings?.activeToolId || 'unknown';
+  console.log(`[Creator] Generating ${settings.count || 1} image(s) for tool: ${activeToolId}`);
+
+  if (isGenerationInProgress) {
+    throw new Error("Generation already in progress. Please wait.");
+  }
+
+  isGenerationInProgress = true;
+  try {
+    return await withRetry(async () => {
+      const ai = getAI();
+      const creatorSettings = settings.creator;
+      if (!creatorSettings || !creatorSettings.activeToolId) {
+        throw new Error('Creator tool not selected');
+      }
+
+      const { activeToolId, inputs } = creatorSettings;
+      
+      const toolLabel = CREATOR_TOOLS.find(t => t.id === activeToolId)?.label || activeToolId;
+
+      const prompt = `
+        TASK: PROFESSIONAL ${toolLabel.toUpperCase()} ASSET GENERATION.
+        
+        CREATOR TYPE: ${toolLabel}
+        ${inputs.mainText ? `MAIN TEXT/TOPIC: ${inputs.mainText}` : ''}
+        ${inputs.brandName ? `BRAND/AUTHOR: ${inputs.brandName}` : ''}
+        ${inputs.tagline ? `TAGLINE/SUBTEXT: ${inputs.tagline}` : ''}
+        ${inputs.style ? `SELECTED STYLE: ${inputs.style}` : ''}
+        ${inputs.description ? `DETAILS/AESTHETIC: ${inputs.description}` : ''}
+        ${inputs.colors ? `COLOR PALETTE: ${inputs.colors}` : ''}
+        ${creatorSettings.customPrompt ? `ADDITIONAL INSTRUCTIONS: ${creatorSettings.customPrompt}` : ''}
+
+        EXECUTION RULES:
+        - HIGH-END QUALITY: The result must look like it was created by a world-class professional designer/illustrator.
+        - TYPOGRAPHY & DESIGN: If text is included, render it clearly and elegantly with balanced typography.
+        - COMPOSITION: Professional layout, balanced elements, and intentional whitespace.
+        - CLARITY: Sharp focus, clean vectors/renderings, and accurate color representation.
+        ${base64Image ? '- REFERENCE: Use the provided IMAGE as a strong visual reference for style, composition, or subject.' : ''}
+
+        SPECIAL RULES FOR ${activeToolId.toUpperCase()}:
+        ${activeToolId === 'logo' ? '- Focus on iconic, memorable, and scalable logo design. Clean vectors, balanced proportions. Avoid generic clip-art looks.' : ''}
+        ${activeToolId === 'illustrator' ? `- Focus on the ${inputs.style || 'artistic'} style. Consistent strokes, texture, and artistic soul across the whole frame.` : ''}
+        ${activeToolId === 'youtube-thumb' ? '- High-energy, high-contrast, bold popping text, expressive and thumb-stopping visual hook.' : ''}
+        ${activeToolId === 'sticker' || activeToolId === 'clip-art' ? '- Use a clean, isolated style. For stickers, include a professional white die-cut border/outline.' : ''}
+        ${activeToolId === 'coloring-page' ? '- STRICTLY black and white line art only. No gray, no shadows, no color. Clean, sharp black outlines on a pure white background.' : ''}
+        ${activeToolId === 'pattern' ? '- Create a stunning seamless pattern layout. Balanced repetition and beautiful flow.' : ''}
+
+        QUALITY:
+        - 8k Resolution
+        - Professional Creative Suite rendering
+        - Commercial grade results
+      `;
+
+      const parts = [];
+      if (base64Image) {
+        parts.push({ inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: "image/jpeg" } });
+      }
+      parts.push({ text: prompt.trim() });
+
+      const response: GenerateContentResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents: { parts },
+        config: {
+          imageConfig: { aspectRatio: settings.ratio as any },
+          temperature: 0.2,
+          topP: 0.8
+        }
+      });
+
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            return {
+              url: `data:image/png;base64,${part.inlineData.data}`,
+              prompt: prompt.trim()
+            };
+          }
+        }
+      }
+
+      throw new Error("Model success but no image was returned. Check safety filters.");
+    });
+  } catch (error: any) {
+    console.error("Creator Gemini Error:", error);
+    const errorMessage = error?.message?.toLowerCase() || '';
+    if (errorMessage.includes('safety') || errorMessage.includes('blocked') || errorMessage.includes('content policy')) {
+      throw new Error("Sorry, this creation could not be generated due to AI content safety restrictions. Please try a different prompt.");
+    }
+    throw error;
+  } finally {
+    isGenerationInProgress = false;
+  }
+}
+
+export async function generateKidsZoneImage(
+  settings: GenerationSettings,
+  base64Image?: string
+): Promise<GenerationResult> {
+  const kidsSettings = settings.kidsZone;
+  const activeActivityId = kidsSettings?.activeActivityId || 'unknown';
+  console.log(`[KidsZone] Generating ${settings.count || 1} image(s) for activity: ${activeActivityId}`);
+
+  if (isGenerationInProgress) {
+    throw new Error("Generation already in progress. Please wait.");
+  }
+
+  isGenerationInProgress = true;
+  try {
+    return await withRetry(async () => {
+      const ai = getAI();
+      if (!kidsSettings || !kidsSettings.activeActivityId) {
+        throw new Error('Kids activity not selected');
+      }
+
+      const { activeActivityId, inputs } = kidsSettings;
+      const activityLabel = KIDS_ACTIVITIES.find(a => a.id === activeActivityId)?.label || activeActivityId;
+
+      const prompt = `
+        TASK: HIGH-QUALITY EDUCATIONAL KIDS ACTIVITY SHEET GENERATION.
+        
+        ACTIVITY TYPE: ${activityLabel}
+        ${inputs.pageTitle ? `PAGE TITLE: ${inputs.pageTitle}` : ''}
+        ${inputs.theme ? `THEME/IDEA: ${inputs.theme}` : ''}
+        ${inputs.difficulty ? `DIFFICULTY: ${inputs.difficulty}` : ''}
+        ${inputs.mazeType ? `MAZE TYPE: ${inputs.mazeType}` : ''}
+        ${inputs.illustrationStyle ? `ILLUSTRATION STYLE: ${inputs.illustrationStyle}` : ''}
+        ${inputs.primaryColor ? `PRIMARY COLOR: ${inputs.primaryColor}` : ''}
+        ${inputs.secondaryColor ? `SECONDARY COLOR/ACCENT: ${inputs.secondaryColor}` : ''}
+        ${inputs.numItems ? `NUMBER OF ITEMS/PAIRS: ${inputs.numItems}` : ''}
+        ${inputs.language ? `LANGUAGE: ${inputs.language}` : ''}
+        ${kidsSettings.customPrompt ? `ADDITIONAL INSTRUCTIONS: ${kidsSettings.customPrompt}` : ''}
+
+        EXECUTION RULES:
+        - TARGET AUDIENCE: Children aged 3 to 10 years old. Fun, friendly, and educational.
+        - DESIGN STYLE: Bright, playful colors (unless it's a coloring page). Kid-friendly, legible typography.
+        - COMPOSITION: Clean, organized layout ready for printing (A4 aspect). Elements should be well-spaced.
+        - ARTWORK: Cute characters, clear icons, and recognizable objects.
+        ${base64Image ? '- REFERENCE STYLE: Use the provided IMAGE as a strong visual reference for character design, color palette, or artistic style.' : ''}
+
+        SPECIAL ACTIVITY RULES:
+        ${activeActivityId === 'maze' ? '- Create a functional, solvable maze based on the theme. Clear entrance and exit.' : ''}
+        ${activeActivityId === 'coloring-page' ? '- BOLD black outlines on a pure white background. NO gray, NO shadows. High contrast for easy coloring.' : ''}
+        ${activeActivityId === 'spot-differences' ? '- Show two nearly identical panels side-by-side or top-bottom with exactly the requested number of subtle differences.' : ''}
+        ${activeActivityId === 'shadow-matching' ? '- Display objects on one side and their solid black/gray silhouette shadows on the other.' : ''}
+        ${activeActivityId === 'tracing-sheet' ? '- Large, clear letters or numbers with dotted or dashed lines for tracing. Include a guided line if possible.' : ''}
+        ${activeActivityId === 'hidden-object' ? '- A dense, detailed illustration where the objects are cleverly integrated into the scene.' : ''}
+        ${activeActivityId === 'math-puzzle' ? '- Use visual representations (objects/fruits) for numbers. Simple and intuitive.' : ''}
+        ${activeActivityId === 'storybook' ? '- Full-page storybook illustration with room at the top or bottom for narrative text.' : ''}
+
+        QUALITY:
+        - 4k Sharp resolution
+        - Professional educational materials standard
+        - "Sparkle" quality - high engagement for kids
+      `;
+
+      const parts = [];
+      if (base64Image) {
+        parts.push({ inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: "image/jpeg" } });
+      }
+      parts.push({ text: prompt.trim() });
+
+      const response: GenerateContentResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents: { parts },
+        config: {
+          imageConfig: { aspectRatio: settings.ratio as any },
+          temperature: 0.3,
+          topP: 0.9
+        }
+      });
+
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            return {
+              url: `data:image/png;base64,${part.inlineData.data}`,
+              prompt: prompt.trim()
+            };
+          }
+        }
+      }
+
+      throw new Error("Model success but no activity sheet returned. Check safety filters.");
+    });
+  } catch (error: any) {
+    console.error("KidsZone Gemini Error:", error);
+    const errorMessage = error?.message?.toLowerCase() || '';
+    if (errorMessage.includes('safety') || errorMessage.includes('blocked') || errorMessage.includes('content policy')) {
+      throw new Error("Sorry, this activity could not be generated due to AI content safety restrictions. Please try a different theme.");
+    }
+    throw error;
+  } finally {
+    isGenerationInProgress = false;
+  }
+}
+
+export async function enhancePromptWithReferences(
+  originalPrompt: string,
+  faceBase64?: string,
+  styleBase64?: string
+): Promise<string> {
+  try {
+    const ai = getAI();
+
+    const hasFaceRef = !!faceBase64;
+    const hasStyleRef = !!styleBase64;
+
+    let faceAnalysisText = "";
+    let styleAnalysisText = "";
+
+    if (hasFaceRef && faceBase64) {
+      const faceAnalysis = await analyzeFace(faceBase64);
+      faceAnalysisText = `\nFACE / IDENTITY REFERENCE:\n${faceAnalysis}`;
+    }
+
+    if (hasStyleRef && styleBase64) {
+      const styleAnalysis = await analyzeStyleReference(styleBase64);
+      styleAnalysisText = `\nSTYLE REFERENCE BLUEPRINT:\n${styleAnalysis}`;
+    }
+
+    const enhancementPrompt = `
+      TASK: ENHANCE AND IMPROVE A USER'S IMAGE GENERATION PROMPT.
+
+      ORIGINAL USER PROMPT:
+      "${originalPrompt}"
+
+      ${faceAnalysisText}
+      ${styleAnalysisText}
+
+      CONTEXT RULES:
+      ${hasFaceRef ? `
+      - A Face Reference is provided.
+      - The enhanced prompt must treat the Face Reference as the ONLY identity source.
+      - Preserve the subject's identity from the Face Reference.
+      ` : `
+      - No Face Reference is provided.
+      - Do not add identity-lock language.
+      `}
+
+      ${hasStyleRef ? `
+      - A Style Reference is provided.
+      ${hasFaceRef ? `
+      - Since a Face Reference is also provided, use the Style Reference ONLY for non-identity details:
+        lighting, background, pose, clothing style, camera angle, props, atmosphere, and overall aesthetic.
+      - Do NOT incorporate or describe the Style Reference person's face, identity, ethnicity, age, expression, eyes, nose, lips, or facial details.
+      - Do NOT make the Style Reference person the subject.
+      ` : `
+      - Since no Face Reference is provided, use the Style Reference as visual guidance for style, composition, lighting, pose, background, and aesthetic.
+      - Still keep the user's original prompt as the main instruction.
+      `}
+      ` : `
+      - No Style Reference is provided.
+      `}
+
+      INSTRUCTIONS:
+      1. Expand the original prompt into a detailed professional image-generation prompt.
+      2. Preserve the original user intent. Do not change the subject unless the user asked.
+      3. Add useful details about lighting, composition, camera framing, texture, mood, and quality.
+      4. If Face Reference exists, include identity-lock wording clearly.
+      5. If Style Reference exists with Face Reference, include style-reference wording only as non-face blueprint.
+      6. If no Face Reference exists, do not mention exact identity lock.
+      7. Output ONLY the enhanced prompt text. No explanation. No markdown.
+      `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-lite",
+      contents: [{ role: "user", parts: [{ text: enhancementPrompt.trim() }] }]
+    });
+
+    return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || originalPrompt;
+  } catch (error) {
+    console.error("Enhance Prompt Error:", error);
+    return originalPrompt;
+  }
+}
+
+export function clearFaceCache() {
+  faceAnalysisCache.clear();
+  console.log("Face analysis cache cleared.");
+}
+
+export function clearStyleCache() {
+  styleAnalysisCache.clear();
+  console.log("Style analysis cache cleared.");
 }
